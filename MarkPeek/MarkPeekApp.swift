@@ -1,13 +1,20 @@
 import SwiftUI
 import WebKit
 
+extension Color {
+    /// Brand brown sampled from the app icon — the app's single accent.
+    static let brand = Color(.sRGB, red: 0.545, green: 0.373, blue: 0.243)
+}
+
 @main
 struct MarkPeekApp: App {
     var body: some Scene {
-        WindowGroup {
+        Window("MarkPeek", id: "main") {
             SettingsView()
-                .frame(minWidth: 900, minHeight: 580)
+                .frame(minWidth: 880, minHeight: 560)
+                .tint(.brand)
         }
+        .windowResizability(.contentMinSize)
     }
 }
 
@@ -58,6 +65,11 @@ final class SettingsStore: ObservableObject {
         return "Custom (unsaved)"
     }
 
+    var selectedCustomPreset: CustomPreset? {
+        guard let id = settings.customPresetID else { return nil }
+        return customPresets.first { $0.id == id }
+    }
+
     func apply(_ style: MarkdownStyle) {
         settings = PreviewSettings.preset(style)
     }
@@ -99,16 +111,16 @@ struct SettingsView: View {
         HSplitView {
             TabView {
                 PresetsTab(store: store)
-                    .tabItem { Text("Presets") }
+                    .tabItem { Label("Presets", systemImage: "square.grid.2x2") }
                 TypographyTab(store: store)
-                    .tabItem { Text("Typography") }
+                    .tabItem { Label("Typography", systemImage: "textformat") }
                 LayoutTab(store: store)
-                    .tabItem { Text("Layout") }
+                    .tabItem { Label("Layout", systemImage: "ruler") }
                 ColorsTab(store: store)
-                    .tabItem { Text("Colors") }
+                    .tabItem { Label("Colors", systemImage: "paintpalette") }
             }
-            .padding(8)
-            .frame(minWidth: 400, idealWidth: 420, maxWidth: 500)
+            .padding(.top, 8)
+            .frame(minWidth: 400, idealWidth: 430, maxWidth: 520)
             PreviewPane(settings: store.settings, previewDark: $previewDark)
                 .frame(minWidth: 400, maxWidth: .infinity)
         }
@@ -116,6 +128,12 @@ struct SettingsView: View {
 }
 
 // MARK: - Presets tab
+
+private enum PresetRowID: Hashable {
+    case builtin(MarkdownStyle)
+    case custom(UUID)
+    case unsaved
+}
 
 struct PresetsTab: View {
     @ObservedObject var store: SettingsStore
@@ -128,59 +146,102 @@ struct PresetsTab: View {
         var action: (String) -> Void
     }
 
+    private var selection: Binding<PresetRowID?> {
+        Binding(
+            get: {
+                if let style = MarkdownStyle(rawValue: store.settings.presetName) { return .builtin(style) }
+                if let id = store.settings.customPresetID { return .custom(id) }
+                return .unsaved
+            },
+            set: { newValue in
+                switch newValue {
+                case .builtin(let style): store.apply(style)
+                case .custom(let id):
+                    if let preset = store.customPresets.first(where: { $0.id == id }) {
+                        store.apply(preset)
+                    }
+                case .unsaved, nil: break
+                }
+            }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            List {
+            List(selection: selection) {
                 Section("Built-in") {
                     ForEach(MarkdownStyle.allCases, id: \.self) { style in
-                        presetRow(
-                            name: style.displayName,
-                            selected: store.settings.presetName == style.rawValue
-                        ) { store.apply(style) }
+                        Label(style.displayName, systemImage: symbol(for: style))
+                            .tag(PresetRowID.builtin(style))
                     }
                 }
                 Section("My Presets") {
                     ForEach(store.customPresets) { preset in
-                        presetRow(
-                            name: preset.name,
-                            selected: store.settings.customPresetID == preset.id
-                        ) { store.apply(preset) }
-                        .contextMenu {
-                            Button("Rename…") {
-                                namingSheet = NamingSheet(title: "Rename Preset", name: preset.name) {
-                                    store.rename(preset, to: $0)
+                        Label(preset.name, systemImage: "paintbrush.pointed")
+                            .tag(PresetRowID.custom(preset.id))
+                            .contextMenu {
+                                Button("Rename…") {
+                                    namingSheet = NamingSheet(title: "Rename Preset", name: preset.name) {
+                                        store.rename(preset, to: $0)
+                                    }
                                 }
+                                Divider()
+                                Button("Delete", role: .destructive) { store.delete(preset) }
                             }
-                            Button("Delete", role: .destructive) { store.delete(preset) }
-                        }
                     }
                     if store.settings.presetName == "custom" {
-                        presetRow(name: "Custom (unsaved)", selected: true) {}
+                        Label("Custom (unsaved)", systemImage: "pencil.circle")
                             .foregroundStyle(.secondary)
+                            .tag(PresetRowID.unsaved)
                     }
                     if store.customPresets.isEmpty && store.settings.presetName != "custom" {
-                        Text("No presets yet. Adjust any setting, then save it here.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Label {
+                            Text("Adjust any setting, then save it with +")
+                        } icon: {
+                            Image(systemName: "plus.square.dashed")
+                        }
+                        .font(.callout)
+                        .foregroundStyle(.tertiary)
+                        .selectionDisabled()
                     }
                 }
             }
+            .animation(.snappy, value: store.customPresets)
 
             Divider()
-            HStack {
+            HStack(spacing: 2) {
                 Button {
                     namingSheet = NamingSheet(title: "Save Preset", name: suggestedName()) {
                         store.saveAsNewPreset(named: $0)
                     }
                 } label: {
-                    Label("Save Current as Preset…", systemImage: "plus")
+                    Image(systemName: "plus")
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel("Save current settings as a new preset")
+                .help("Save current settings as a new preset")
+
+                Button {
+                    if let preset = store.selectedCustomPreset { store.delete(preset) }
+                } label: {
+                    Image(systemName: "minus")
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .disabled(store.selectedCustomPreset == nil)
+                .accessibilityLabel("Delete selected preset")
+                .help("Delete the selected preset")
+
                 Spacer()
-                Text("Active: \(store.currentPresetLabel)")
+                Text(store.currentPresetLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityLabel("Active preset: \(store.currentPresetLabel)")
             }
-            .padding(10)
+            .buttonStyle(.borderless)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
         }
         .sheet(item: $namingSheet) { sheet in
             PresetNameSheet(title: sheet.title, name: sheet.name) { finalName in
@@ -189,23 +250,19 @@ struct PresetsTab: View {
         }
     }
 
+    private func symbol(for style: MarkdownStyle) -> String {
+        switch style {
+        case .modern: "doc.richtext"
+        case .serif: "text.book.closed"
+        case .github: "chevron.left.forwardslash.chevron.right"
+        case .plain: "doc.plaintext"
+        }
+    }
+
     private func suggestedName() -> String {
         var n = 1
         while store.customPresets.contains(where: { $0.name == "My Preset \(n)" }) { n += 1 }
         return "My Preset \(n)"
-    }
-
-    private func presetRow(name: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        HStack {
-            Text(name)
-            Spacer()
-            if selected {
-                Image(systemName: "checkmark")
-                    .foregroundStyle(.tint)
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture(perform: action)
     }
 }
 
@@ -216,19 +273,25 @@ struct PresetNameSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text(title).font(.headline)
+        VStack(spacing: 14) {
+            Image(systemName: "paintbrush.pointed")
+                .font(.largeTitle)
+                .foregroundStyle(.tint)
+            Text(title)
+                .font(.headline)
             TextField("Preset name", text: $name)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 240)
                 .onSubmit(save)
-            HStack {
+            HStack(spacing: 10) {
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button("Save", action: save)
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
+            .padding(.top, 4)
         }
         .padding(24)
     }
@@ -258,10 +321,10 @@ struct TypographyTab: View {
     var body: some View {
         Form {
             Section("Fonts") {
-                fontPicker("Body font", selection: store.customize(\.bodyFont), fonts: Self.bodyFonts)
-                fontPicker("Code font", selection: store.customize(\.codeFont), fonts: Self.codeFonts)
-                SettingSlider("Font size", value: store.customize(\.fontSize), in: 10...24, step: 1, format: "%.0f px")
-                SettingSlider("Line height", value: store.customize(\.lineHeight), in: 1.2...2.2, step: 0.05, format: "%.2f")
+                fontPicker("Body Font", selection: store.customize(\.bodyFont), fonts: Self.bodyFonts)
+                fontPicker("Code Font", selection: store.customize(\.codeFont), fonts: Self.codeFonts)
+                SettingSlider("Size", value: store.customize(\.fontSize), in: 10...24, step: 1, format: "%.0f px")
+                SettingSlider("Line Height", value: store.customize(\.lineHeight), in: 1.2...2.2, step: 0.05, format: "%.2f")
             }
             Section("Headings") {
                 Picker("Weight", selection: store.customize(\.headingWeight)) {
@@ -271,10 +334,12 @@ struct TypographyTab: View {
                     Text("Bold").tag(700)
                     Text("Heavy").tag(800)
                 }
-                Toggle("Underline H1 / H2", isOn: store.customize(\.headingUnderline))
+                Toggle("Underline H1 and H2", isOn: store.customize(\.headingUnderline))
+                    .toggleStyle(.switch)
             }
             Section("Blockquotes") {
-                Toggle("Italic text", isOn: store.customize(\.blockquoteItalic))
+                Toggle("Italic Text", isOn: store.customize(\.blockquoteItalic))
+                    .toggleStyle(.switch)
             }
         }
         .formStyle(.grouped)
@@ -300,14 +365,14 @@ struct LayoutTab: View {
     var body: some View {
         Form {
             Section("Page") {
-                SettingSlider("Content width", value: store.customize(\.maxWidth), in: 0...1200, step: 50,
+                SettingSlider("Content Width", value: store.customize(\.maxWidth), in: 0...1200, step: 50,
                               format: "%.0f px", zeroLabel: "Full")
-                SettingSlider("Page margin", value: store.customize(\.pagePadding), in: 0...100, step: 5, format: "%.0f px")
-                SettingSlider("Paragraph spacing", value: store.customize(\.paragraphSpacing), in: 0...2.5, step: 0.25, format: "%.2f em")
+                SettingSlider("Margin", value: store.customize(\.pagePadding), in: 0...100, step: 5, format: "%.0f px")
+                SettingSlider("Paragraph Spacing", value: store.customize(\.paragraphSpacing), in: 0...2.5, step: 0.25, format: "%.2f em")
             }
             Section("Code Blocks") {
                 SettingSlider("Padding", value: store.customize(\.codeBlockPadding), in: 0...32, step: 2, format: "%.0f px")
-                SettingSlider("Corner radius", value: store.customize(\.cornerRadius), in: 0...16, step: 1, format: "%.0f px")
+                SettingSlider("Corner Radius", value: store.customize(\.cornerRadius), in: 0...16, step: 1, format: "%.0f px")
             }
         }
         .formStyle(.grouped)
@@ -322,7 +387,7 @@ struct ColorsTab: View {
     var body: some View {
         Form {
             Section("Appearance") {
-                Picker("Dark mode", selection: store.customize(\.appearance)) {
+                Picker("Previews Follow", selection: store.customize(\.appearance)) {
                     ForEach(PreviewSettings.Appearance.allCases, id: \.self) { mode in
                         Text(mode.displayName).tag(mode)
                     }
@@ -341,11 +406,11 @@ struct ColorsTab: View {
             colorRow("Text", set.appending(path: \.text))
             colorRow("Headings", set.appending(path: \.heading))
             colorRow("Links", set.appending(path: \.link))
-            colorRow("Code background", set.appending(path: \.codeBackground))
-            colorRow("Code text", set.appending(path: \.codeText))
-            colorRow("Blockquote text", set.appending(path: \.blockquoteText))
-            colorRow("Blockquote border", set.appending(path: \.blockquoteBorder))
-            colorRow("Rules & underlines", set.appending(path: \.rule))
+            colorRow("Code Background", set.appending(path: \.codeBackground))
+            colorRow("Code Text", set.appending(path: \.codeText))
+            colorRow("Blockquote Text", set.appending(path: \.blockquoteText))
+            colorRow("Blockquote Border", set.appending(path: \.blockquoteBorder))
+            colorRow("Rules & Underlines", set.appending(path: \.rule))
         }
     }
 
@@ -379,13 +444,15 @@ struct SettingSlider: View {
     }
 
     var body: some View {
-        HStack {
-            Text(label)
-            Slider(value: value, in: range, step: step)
-            Text(value.wrappedValue == 0 && zeroLabel != nil ? zeroLabel! : String(format: format, value.wrappedValue))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .frame(width: 52, alignment: .trailing)
+        LabeledContent(label) {
+            HStack(spacing: 8) {
+                Slider(value: value, in: range, step: step)
+                Text(value.wrappedValue == 0 && zeroLabel != nil ? zeroLabel! : String(format: format, value.wrappedValue))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 48, alignment: .trailing)
+            }
+            .frame(maxWidth: 240)
         }
     }
 }
@@ -395,22 +462,37 @@ struct SettingSlider: View {
 struct PreviewPane: View {
     let settings: PreviewSettings
     @Binding var previewDark: Bool
+    @State private var showingHelp = false
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Live Preview")
+                Text("Preview")
                     .font(.headline)
                 Spacer()
-                Picker("", selection: $previewDark) {
+                Picker("Preview appearance", selection: $previewDark) {
                     Label("Light", systemImage: "sun.max").tag(false)
                     Label("Dark", systemImage: "moon").tag(true)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .fixedSize()
+
+                Button {
+                    showingHelp.toggle()
+                } label: {
+                    Image(systemName: "questionmark.circle")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Setup help")
+                .help("How to use MarkPeek")
+                .popover(isPresented: $showingHelp, arrowEdge: .bottom) {
+                    SetupHelp()
+                }
             }
-            .padding(10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.bar)
             Divider()
             MarkdownWebView(
                 html: MarkdownRenderer.html(from: Self.sampleMarkdown, settings: settings),
@@ -443,6 +525,26 @@ struct PreviewPane: View {
 
     Final paragraph after a horizontal rule.
     """
+}
+
+struct SetupHelp: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Select any .md file in Finder", systemImage: "1.circle")
+            Label("Press Space to Quick Look it", systemImage: "2.circle")
+            Label("It renders with the active preset", systemImage: "3.circle")
+            Divider()
+            Text("Previews not styled?")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button("Open Quick Look Extension Settings…") {
+                let url = URL(string: "x-apple.systempreferences:com.apple.ExtensionsPreferences?extensionPointIdentifier=com.apple.quicklook.preview")!
+                NSWorkspace.shared.open(url)
+            }
+        }
+        .padding(16)
+        .frame(width: 300)
+    }
 }
 
 struct MarkdownWebView: NSViewRepresentable {
