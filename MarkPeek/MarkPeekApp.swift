@@ -15,22 +15,22 @@ struct MarkPeekApp: App {
     @ObservedObject private var model = ReaderModel.shared
 
     var body: some Scene {
-        Window("MarkPeek", id: "reader") {
-            ReaderView()
-                .frame(minWidth: 640, minHeight: 440)
+        Window("MarkPeek", id: "main") {
+            MainView()
+                .frame(minWidth: 760, minHeight: 480)
         }
-        .defaultSize(width: 780, height: 540)
+        .defaultSize(width: 940, height: 620)
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open…") { ReaderModel.shared.isImporting = true }
                     .keyboardShortcut("o")
             }
-        }
-
-        Settings {
-            SettingsView()
-                .frame(minWidth: 880, minHeight: 560)
+            CommandGroup(replacing: .saveItem) {
+                Button("Save") { ReaderModel.shared.save() }
+                    .keyboardShortcut("s")
+                    .disabled(!model.hasUnsavedChanges)
+            }
         }
     }
 }
@@ -59,9 +59,16 @@ final class ReaderModel: ObservableObject {
 
     @Published var fileURL: URL?
     @Published var markdown = ""
+    @Published var draft = ""
+    @Published var isEditing = false
     @Published var isImporting = false
     @Published var loadError: String?
     @Published var recents: [RecentFile] = ReaderModel.loadRecents()
+
+    /// URL currently holding a security-scope access grant (kept while the file is open so edits can be saved).
+    private var accessedURL: URL?
+
+    var hasUnsavedChanges: Bool { fileURL != nil && draft != markdown }
 
     static let markdownExtensions = ["md", "markdown", "mdown", "mkd", "mkdn"]
 
@@ -74,15 +81,27 @@ final class ReaderModel: ObservableObject {
     }
 
     func open(_ url: URL) {
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        accessedURL?.stopAccessingSecurityScopedResource()
+        accessedURL = url.startAccessingSecurityScopedResource() ? url : nil
         do {
             markdown = try Self.readText(at: url)
+            draft = markdown
             fileURL = url
+            isEditing = false
             loadError = nil
             noteRecent(url)
         } catch {
             loadError = "Couldn't read \(url.lastPathComponent)"
+        }
+    }
+
+    func save() {
+        guard let url = fileURL, hasUnsavedChanges else { return }
+        do {
+            try draft.write(to: url, atomically: true, encoding: .utf8)
+            markdown = draft
+        } catch {
+            loadError = "Couldn't save \(url.lastPathComponent). The file may be read-only."
         }
     }
 
@@ -110,7 +129,7 @@ final class ReaderModel: ObservableObject {
     private func noteRecent(_ url: URL) {
         // Dropped files may not allow security-scoped bookmarks; skip those.
         guard let bookmark = try? url.bookmarkData(
-            options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
+            options: [.withSecurityScope],
             includingResourceValuesForKeys: nil,
             relativeTo: nil
         ) else { return }
@@ -143,7 +162,78 @@ final class ReaderModel: ObservableObject {
     }
 }
 
-// MARK: - Reader (main window)
+// MARK: - Main window: sidebar + detail
+
+enum SidebarItem: String, CaseIterable, Identifiable {
+    case reader, presets, typography, layout, colors, about
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .reader: "Reader"
+        case .presets: "Presets"
+        case .typography: "Typography"
+        case .layout: "Layout"
+        case .colors: "Colors"
+        case .about: "About"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .reader: "doc.richtext"
+        case .presets: "square.grid.2x2"
+        case .typography: "textformat"
+        case .layout: "ruler"
+        case .colors: "paintpalette"
+        case .about: "info.circle"
+        }
+    }
+}
+
+struct MainView: View {
+    @State private var selection: SidebarItem = .reader
+    @ObservedObject private var model = ReaderModel.shared
+    @ObservedObject private var store = SettingsStore.shared
+    @State private var previewDark = false
+
+    var body: some View {
+        NavigationSplitView {
+            List(SidebarItem.allCases, selection: $selection) { item in
+                Label(item.title, systemImage: item.icon)
+                    .tag(item)
+            }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 170, ideal: 185, max: 230)
+        } detail: {
+            switch selection {
+            case .reader:
+                ReaderView()
+            case .presets:
+                settingsDetail { PresetsTab(store: store) }
+            case .typography:
+                settingsDetail { TypographyTab(store: store) }
+            case .layout:
+                settingsDetail { LayoutTab(store: store) }
+            case .colors:
+                settingsDetail { ColorsTab(store: store) }
+            case .about:
+                AboutView()
+            }
+        }
+    }
+
+    private func settingsDetail<V: View>(@ViewBuilder content: () -> V) -> some View {
+        HSplitView {
+            content()
+                .frame(minWidth: 340, idealWidth: 400, maxWidth: 480)
+            PreviewPane(settings: store.settings, previewDark: $previewDark)
+                .frame(minWidth: 320, maxWidth: .infinity)
+        }
+    }
+}
+
+// MARK: - Reader
 
 struct ReaderView: View {
     @ObservedObject private var model = ReaderModel.shared
@@ -152,13 +242,15 @@ struct ReaderView: View {
 
     var body: some View {
         Group {
-            if model.fileURL != nil {
+            if model.fileURL == nil {
+                DropBrowseView()
+            } else if model.isEditing {
+                EditorView()
+            } else {
                 MarkdownWebView(
                     html: MarkdownRenderer.html(from: model.markdown, settings: store.settings, pageCard: true),
                     appearance: readerAppearance
                 )
-            } else {
-                WelcomeView()
             }
         }
         .overlay {
@@ -170,6 +262,25 @@ struct ReaderView: View {
         .navigationTitle(model.fileURL?.lastPathComponent ?? "MarkPeek")
         .toolbar {
             ToolbarItemGroup {
+                if model.fileURL != nil {
+                    Picker("Mode", selection: $model.isEditing) {
+                        Label("Preview", systemImage: "eye").tag(false)
+                        Label("Edit", systemImage: "pencil").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .help("Switch between the rendered preview and the editor")
+
+                    if model.isEditing {
+                        Button {
+                            model.save()
+                        } label: {
+                            Label("Save", systemImage: "square.and.arrow.down")
+                        }
+                        .disabled(!model.hasUnsavedChanges)
+                        .help("Save changes (⌘S)")
+                    }
+                }
+
                 PresetMenu(store: store)
 
                 Button {
@@ -178,11 +289,6 @@ struct ReaderView: View {
                     Label("Open", systemImage: "folder")
                 }
                 .help("Open a Markdown file (⌘O)")
-
-                SettingsLink {
-                    Label("Settings", systemImage: "gearshape")
-                }
-                .help("Preview style settings (⌘,)")
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
@@ -198,7 +304,7 @@ struct ReaderView: View {
                 model.open(url)
             }
         }
-        .alert("Couldn't Open File", isPresented: .init(
+        .alert("Something Went Wrong", isPresented: .init(
             get: { model.loadError != nil },
             set: { if !$0 { model.loadError = nil } }
         )) {
@@ -217,7 +323,182 @@ struct ReaderView: View {
     }
 }
 
-/// Toolbar pill for switching the reading style without opening Settings.
+// MARK: - Editor
+
+struct EditorView: View {
+    @ObservedObject private var model = ReaderModel.shared
+
+    var body: some View {
+        VStack(spacing: 0) {
+            TextEditor(text: $model.draft)
+                .font(.system(size: 13, design: .monospaced))
+                .lineSpacing(3)
+                .padding(12)
+                .scrollContentBackground(.hidden)
+                .background(Color(nsColor: .textBackgroundColor))
+            Divider()
+            HStack {
+                if model.hasUnsavedChanges {
+                    Circle().fill(Color.brand).frame(width: 7, height: 7)
+                    Text("Unsaved changes")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Saved")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                Spacer()
+                Text("\(model.draft.count) characters")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .background(.bar)
+        }
+    }
+}
+
+// MARK: - Drop / browse zone (FinderConvert style)
+
+struct DropBrowseView: View {
+    @ObservedObject private var model = ReaderModel.shared
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Button {
+                model.isImporting = true
+            } label: {
+                VStack(spacing: 12) {
+                    Image(systemName: "arrow.down.doc")
+                        .font(.system(size: 40, weight: .light))
+                        .foregroundStyle(Color.brand)
+                    Text("Drop a Markdown file here or click to browse")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text(".md · .markdown · .mdown · .mkd · .mkdn")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 200)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color.primary.opacity(0.03))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(Color.secondary.opacity(0.35), style: StrokeStyle(lineWidth: 1.5, dash: [7, 5]))
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+
+            if !model.recents.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recents")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(model.recents.prefix(5)) { recent in
+                        Button {
+                            model.openRecent(recent)
+                        } label: {
+                            HStack(spacing: 9) {
+                                Image(systemName: "doc.text")
+                                    .foregroundStyle(Color.brand)
+                                Text(recent.name)
+                                    .fontWeight(.medium)
+                                Text((recent.path as NSString).abbreviatingWithTildeInPath)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Spacer()
+                            }
+                            .padding(.vertical, 5)
+                            .padding(.horizontal, 8)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 7))
+                        .contextMenu {
+                            Button("Remove from Recents") { model.removeRecent(recent) }
+                        }
+                    }
+                }
+            }
+
+            Text("Tip: press Space on any .md file in Finder for an instant Quick Look preview.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(28)
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Shown only while a drag hovers over the window.
+struct DropOverlay: View {
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.brand, lineWidth: 3)
+                .padding(10)
+            Label("Drop to Open", systemImage: "arrow.down.doc.fill")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(Color.brand)
+                .padding(.horizontal, 22)
+                .padding(.vertical, 14)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .transition(.opacity)
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - About
+
+struct AboutView: View {
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Spacer()
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 96, height: 96)
+                .shadow(color: .black.opacity(0.18), radius: 9, y: 4)
+            Text("MarkPeek")
+                .font(.system(size: 26, weight: .bold))
+            Text("Version \(appVersion)")
+                .foregroundStyle(.secondary)
+            Text("Styled Markdown everywhere: press Space in Finder for a Quick Look preview, or read and edit right here.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 380)
+                .padding(.top, 4)
+            HStack(spacing: 10) {
+                Button("Quick Look Extension Settings…") {
+                    let url = URL(string: "x-apple.systempreferences:com.apple.ExtensionsPreferences?extensionPointIdentifier=com.apple.quicklook.preview")!
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            .padding(.top, 12)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle("About")
+    }
+}
+
+// MARK: - Preset menu (toolbar pill)
+
 struct PresetMenu: View {
     @ObservedObject var store: SettingsStore
 
@@ -255,185 +536,6 @@ struct PresetMenu: View {
             Label(store.currentPresetLabel, systemImage: "paintbrush.pointed")
         }
         .help("Reading style")
-    }
-}
-
-// MARK: - Welcome (Xcode-style: brand pane + recents)
-
-struct WelcomeView: View {
-    @ObservedObject private var model = ReaderModel.shared
-
-    var body: some View {
-        HStack(spacing: 0) {
-            brandPane
-                .frame(width: 300)
-            Divider()
-            recentsPane
-                .frame(maxWidth: .infinity)
-        }
-    }
-
-    private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-    }
-
-    private var brandPane: some View {
-        VStack(spacing: 4) {
-            Spacer()
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 108, height: 108)
-                .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
-            Text("MarkPeek")
-                .font(.system(size: 28, weight: .bold))
-                .padding(.top, 6)
-            Text("Version \(appVersion)")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Button {
-                    model.isImporting = true
-                } label: {
-                    WelcomeActionLabel(icon: "folder", title: "Open Markdown File…")
-                }
-                SettingsLink {
-                    WelcomeActionLabel(icon: "paintpalette", title: "Customize Styles…")
-                }
-            }
-            .buttonStyle(WelcomeActionStyle())
-            .padding(.top, 28)
-            Spacer()
-            Text("Or press Space on any .md file in Finder")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .padding(.bottom, 14)
-        }
-        .frame(maxHeight: .infinity)
-        .background(BrandWash())
-    }
-
-    private var recentsPane: some View {
-        Group {
-            if model.recents.isEmpty {
-                ContentUnavailableView {
-                    Label("No Recent Files", systemImage: "clock")
-                } description: {
-                    Text("Markdown files you open appear here.")
-                }
-            } else {
-                List {
-                    Section("Recents") {
-                        ForEach(model.recents) { recent in
-                            Button {
-                                model.openRecent(recent)
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Image(systemName: "doc.text")
-                                        .font(.title3)
-                                        .foregroundStyle(Color.brand)
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(recent.name)
-                                            .fontWeight(.medium)
-                                            .lineLimit(1)
-                                        Text(abbreviate(recent.path))
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(1)
-                                            .truncationMode(.middle)
-                                    }
-                                }
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                Button("Remove from Recents") { model.removeRecent(recent) }
-                            }
-                        }
-                    }
-                }
-                .listStyle(.inset)
-                .scrollContentBackground(.hidden)
-            }
-        }
-        .background(Color(nsColor: .controlBackgroundColor))
-    }
-
-    private func abbreviate(_ path: String) -> String {
-        (path as NSString).abbreviatingWithTildeInPath
-    }
-}
-
-/// Warm cream wash in light mode, warm charcoal in dark — the icon's palette.
-struct BrandWash: View {
-    @Environment(\.colorScheme) private var scheme
-
-    var body: some View {
-        LinearGradient(
-            colors: scheme == .dark
-                ? [Color(.sRGB, red: 0.176, green: 0.157, blue: 0.133),
-                   Color(.sRGB, red: 0.141, green: 0.125, blue: 0.106)]
-                : [Color(.sRGB, red: 0.969, green: 0.945, blue: 0.902),
-                   Color(.sRGB, red: 0.933, green: 0.902, blue: 0.847)],
-            startPoint: .top, endPoint: .bottom
-        )
-    }
-}
-
-struct WelcomeActionLabel: View {
-    let icon: String
-    let title: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.body.weight(.medium))
-                .foregroundStyle(Color.brand)
-                .frame(width: 20)
-            Text(title)
-                .fontWeight(.medium)
-            Spacer(minLength: 0)
-        }
-        .frame(width: 210)
-        .contentShape(Rectangle())
-    }
-}
-
-struct WelcomeActionStyle: ButtonStyle {
-    @State private var hovering = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .padding(.vertical, 7)
-            .padding(.horizontal, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(hovering || configuration.isPressed
-                          ? Color.brand.opacity(configuration.isPressed ? 0.22 : 0.12)
-                          : .clear)
-            )
-            .onHover { hovering = $0 }
-    }
-}
-
-/// Shown only while a drag hovers over the window.
-struct DropOverlay: View {
-    var body: some View {
-        ZStack {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color.brand, lineWidth: 3)
-                .padding(10)
-            Label("Drop to Open", systemImage: "arrow.down.doc.fill")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(Color.brand)
-                .padding(.horizontal, 22)
-                .padding(.vertical, 14)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        }
-        .transition(.opacity)
-        .allowsHitTesting(false)
     }
 }
 
@@ -518,32 +620,6 @@ final class SettingsStore: ObservableObject {
         customPresets.removeAll { $0.id == preset.id }
         if settings.customPresetID == preset.id {
             settings.presetName = "custom"
-        }
-    }
-}
-
-// MARK: - Settings window
-
-struct SettingsView: View {
-    @ObservedObject private var store = SettingsStore.shared
-    @State private var previewDark = false
-
-    var body: some View {
-        HSplitView {
-            TabView {
-                PresetsTab(store: store)
-                    .tabItem { Label("Presets", systemImage: "square.grid.2x2") }
-                TypographyTab(store: store)
-                    .tabItem { Label("Typography", systemImage: "textformat") }
-                LayoutTab(store: store)
-                    .tabItem { Label("Layout", systemImage: "ruler") }
-                ColorsTab(store: store)
-                    .tabItem { Label("Colors", systemImage: "paintpalette") }
-            }
-            .padding(.top, 8)
-            .frame(minWidth: 400, idealWidth: 430, maxWidth: 520)
-            PreviewPane(settings: store.settings, previewDark: $previewDark)
-                .frame(minWidth: 400, maxWidth: .infinity)
         }
     }
 }
@@ -764,6 +840,7 @@ struct TypographyTab: View {
             }
         }
         .formStyle(.grouped)
+        .navigationTitle("Typography")
     }
 
     private func fontPicker(_ label: String, selection: Binding<String>, fonts: [String]) -> some View {
@@ -797,6 +874,7 @@ struct LayoutTab: View {
             }
         }
         .formStyle(.grouped)
+        .navigationTitle("Layout")
     }
 }
 
@@ -819,6 +897,7 @@ struct ColorsTab: View {
             colorSection("Dark Colors", set: \.dark)
         }
         .formStyle(.grouped)
+        .navigationTitle("Colors")
     }
 
     private func colorSection(_ title: String, set: WritableKeyPath<PreviewSettings, PreviewSettings.ColorSet>) -> some View {
@@ -878,7 +957,7 @@ struct SettingSlider: View {
     }
 }
 
-// MARK: - Live preview (settings)
+// MARK: - Live preview (settings details)
 
 struct PreviewPane: View {
     let settings: PreviewSettings
