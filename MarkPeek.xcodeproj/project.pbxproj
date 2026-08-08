@@ -17,6 +17,7 @@
 		DD0000000000000000000008 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000009 /* AppIcon.icns */; };
 		DD0000000000000000000009 /* PreviewSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000000000000000000000A /* PreviewSettings.swift */; };
 		DD000000000000000000000A /* PreviewSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000000000000000000000A /* PreviewSettings.swift */; };
+		DD000000000000000000000B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CC000000000000000000000B /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,6 +57,7 @@
 		CC0000000000000000000008 /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
 		CC0000000000000000000009 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		CC000000000000000000000A /* PreviewSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewSettings.swift; sourceTree = "<group>"; };
+		CC000000000000000000000B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -90,6 +92,7 @@
 			isa = PBXGroup;
 			children = (
 				CC0000000000000000000001 /* MarkPeekApp.swift */,
+				CC000000000000000000000B /* Assets.xcassets */,
 				CC0000000000000000000009 /* AppIcon.icns */,
 				CC0000000000000000000002 /* Info.plist */,
 				CC0000000000000000000003 /* MarkPeek.entitlements */,
@@ -208,6 +211,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				DD0000000000000000000008 /* AppIcon.icns in Resources */,
+				DD000000000000000000000B /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -312,6 +316,7 @@
 		110000000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = MarkPeek/MarkPeek.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -331,6 +336,7 @@
 		110000000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = MarkPeek/MarkPeek.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;

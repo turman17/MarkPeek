@@ -18,7 +18,6 @@ struct MarkPeekApp: App {
         Window("MarkPeek", id: "reader") {
             ReaderView()
                 .frame(minWidth: 640, minHeight: 440)
-                .tint(.brand)
         }
         .defaultSize(width: 780, height: 540)
         .windowResizability(.contentMinSize)
@@ -32,7 +31,6 @@ struct MarkPeekApp: App {
         Settings {
             SettingsView()
                 .frame(minWidth: 880, minHeight: 560)
-                .tint(.brand)
         }
     }
 }
@@ -156,7 +154,7 @@ struct ReaderView: View {
         Group {
             if model.fileURL != nil {
                 MarkdownWebView(
-                    html: MarkdownRenderer.html(from: model.markdown, settings: store.settings),
+                    html: MarkdownRenderer.html(from: model.markdown, settings: store.settings, pageCard: true),
                     appearance: readerAppearance
                 )
             } else {
@@ -172,6 +170,8 @@ struct ReaderView: View {
         .navigationTitle(model.fileURL?.lastPathComponent ?? "MarkPeek")
         .toolbar {
             ToolbarItemGroup {
+                PresetMenu(store: store)
+
                 Button {
                     model.isImporting = true
                 } label: {
@@ -214,6 +214,47 @@ struct ReaderView: View {
         case .light: NSAppearance(named: .aqua)
         case .dark: NSAppearance(named: .darkAqua)
         }
+    }
+}
+
+/// Toolbar pill for switching the reading style without opening Settings.
+struct PresetMenu: View {
+    @ObservedObject var store: SettingsStore
+
+    private var selection: Binding<String> {
+        Binding(
+            get: { store.settings.presetName },
+            set: { raw in
+                if let style = MarkdownStyle(rawValue: raw) {
+                    store.apply(style)
+                } else if let id = UUID(uuidString: raw),
+                          let preset = store.customPresets.first(where: { $0.id == id }) {
+                    store.apply(preset)
+                }
+            }
+        )
+    }
+
+    var body: some View {
+        Menu {
+            Picker("Style", selection: selection) {
+                ForEach(MarkdownStyle.allCases, id: \.self) { style in
+                    Text(style.displayName).tag(style.rawValue)
+                }
+            }
+            .pickerStyle(.inline)
+            if !store.customPresets.isEmpty {
+                Picker("My Presets", selection: selection) {
+                    ForEach(store.customPresets) { preset in
+                        Text(preset.name).tag(preset.id.uuidString)
+                    }
+                }
+                .pickerStyle(.inline)
+            }
+        } label: {
+            Label(store.currentPresetLabel, systemImage: "paintbrush.pointed")
+        }
+        .help("Reading style")
     }
 }
 
@@ -875,7 +916,7 @@ struct PreviewPane: View {
             .background(.bar)
             Divider()
             MarkdownWebView(
-                html: MarkdownRenderer.html(from: Self.sampleMarkdown, settings: settings),
+                html: MarkdownRenderer.html(from: Self.sampleMarkdown, settings: settings, pageCard: true),
                 appearance: NSAppearance(named: previewDark ? .darkAqua : .aqua)
             )
         }

@@ -3,7 +3,10 @@ import Foundation
 // Markdown → HTML conversion ported from FinderConvert's DocumentConversionEngine
 // so previews match the converter's output exactly.
 public enum MarkdownRenderer {
-    public static func html(from markdown: String, settings: PreviewSettings) -> String {
+    /// pageCard renders the document on a floating "paper" card over a neutral
+    /// surface (used by the app's reader and settings preview). Quick Look
+    /// previews stay edge-to-edge.
+    public static func html(from markdown: String, settings: PreviewSettings, pageCard: Bool = false) -> String {
         var html = ""
         let lines = markdown.components(separatedBy: .newlines)
         var inCodeBlock = false
@@ -98,16 +101,40 @@ public enum MarkdownRenderer {
         if inCodeBlock { html += "</code></pre>\n" }
         if inList { html += "</\(listType)>\n" }
 
+        let body = pageCard ? "<div class=\"page\">\n\(html)</div>" : html
+        let extraCSS = pageCard ? "\n" + pageCardCSS(settings) : ""
         return """
         <!DOCTYPE html>
         <html><head><meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-        \(settings.css)
+        \(settings.css)\(extraCSS)
         </style></head><body>
-        \(html)
+        \(body)
         </body></html>
         """
+    }
+
+    private static func pageCardCSS(_ s: PreviewSettings) -> String {
+        let width = s.maxWidth > 0 ? "\(Int(s.maxWidth))px" : "820px"
+        func block(desk: String, page: String, shadow: String) -> String {
+            """
+            body { background: \(desk); max-width: none; margin: 0; padding: \(max(24, Int(s.pagePadding)))px 24px; }
+            .page { background: \(page); max-width: \(width); margin: 0 auto; padding: 34px 38px; border-radius: 10px; box-shadow: \(shadow); }
+            """
+        }
+        let light = block(
+            desk: "#F2F0EC", page: s.light.background,
+            shadow: "0 6px 24px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)")
+        let dark = block(
+            desk: "#1E1C1A", page: s.dark.background,
+            shadow: "0 8px 28px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06)")
+        switch s.appearance {
+        case .light: return light
+        case .dark: return dark
+        case .system:
+            return light + "\n@media (prefers-color-scheme: dark) {\n" + dark + "\n}"
+        }
     }
 
     private static func processInline(_ text: String) -> String {
