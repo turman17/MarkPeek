@@ -2,7 +2,7 @@ import Foundation
 
 // Full visual customization for markdown previews. Stored as JSON in the
 // app-group defaults so the app and the Quick Look extension share it.
-public struct PreviewSettings: Codable, Equatable, Sendable {
+public struct PreviewSettings: Codable, Equatable, Hashable, Sendable {
 
     public enum Appearance: String, Codable, CaseIterable, Sendable {
         case system, light, dark
@@ -16,7 +16,7 @@ public struct PreviewSettings: Codable, Equatable, Sendable {
         }
     }
 
-    public struct ColorSet: Codable, Equatable, Sendable {
+    public struct ColorSet: Codable, Equatable, Hashable, Sendable {
         public var background: String
         public var text: String
         public var heading: String
@@ -129,18 +129,20 @@ public struct PreviewSettings: Codable, Equatable, Sendable {
 
     // MARK: - Persistence
 
-    public static let appGroupID = "group.com.markpeek.app.shared"
+    public static let appGroupID = "YJ3UZ772GP.com.markpeek.app.shared"
+    private static let legacyGroupID = "group.com.markpeek.app.shared"
     public static let defaultsKey = "previewSettings"
     private static let legacyStyleKey = "markdownStyle"
 
     public static func load() -> PreviewSettings {
-        let defaults = UserDefaults(suiteName: appGroupID)
-        if let data = defaults?.data(forKey: defaultsKey),
-           let settings = try? JSONDecoder().decode(PreviewSettings.self, from: data) {
-            return settings
+        for suite in [appGroupID, legacyGroupID] {
+            if let data = UserDefaults(suiteName: suite)?.data(forKey: defaultsKey),
+               let settings = try? JSONDecoder().decode(PreviewSettings.self, from: data) {
+                return settings
+            }
         }
         // Migrate from the old preset-only preference
-        if let raw = defaults?.string(forKey: legacyStyleKey),
+        if let raw = UserDefaults(suiteName: legacyGroupID)?.string(forKey: legacyStyleKey),
            let style = MarkdownStyle(rawValue: raw) {
             return preset(style)
         }
@@ -240,11 +242,13 @@ public enum PresetLibrary {
     private static let key = "customPresets"
 
     public static func load() -> [CustomPreset] {
-        guard let data = UserDefaults(suiteName: PreviewSettings.appGroupID)?.data(forKey: key),
-              let presets = try? JSONDecoder().decode([CustomPreset].self, from: data) else {
-            return []
+        for suite in [PreviewSettings.appGroupID, "group.com.markpeek.app.shared"] {
+            if let data = UserDefaults(suiteName: suite)?.data(forKey: key),
+               let presets = try? JSONDecoder().decode([CustomPreset].self, from: data) {
+                return presets
+            }
         }
-        return presets
+        return []
     }
 
     public static func save(_ presets: [CustomPreset]) {

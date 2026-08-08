@@ -1,13 +1,20 @@
 #!/bin/bash
 # Build MarkPeek, sign, install to /Applications, and register the Quick Look extension.
 #
-# Signing identity: set SIGNING_IDENTITY env var for distribution.
-# For development/testing, defaults to ad-hoc signing ("-").
+# Signing identity: set SIGNING_IDENTITY env var to override.
+# Defaults to the first Apple Development certificate in the keychain so the
+# signature stays stable across rebuilds (permissions persist); falls back to
+# ad-hoc ("-") when no certificate is available.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
+if [ -z "${SIGNING_IDENTITY:-}" ]; then
+    SIGNING_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
+        | grep -o '"Apple Development: [^"]*"' | head -1 | tr -d '"')
+    SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
+fi
+echo "==> Signing identity: $SIGNING_IDENTITY"
 CONFIGURATION="${CONFIGURATION:-Release}"
 
 echo "==> Building MarkPeek ($CONFIGURATION)..."

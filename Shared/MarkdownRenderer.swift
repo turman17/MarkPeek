@@ -116,19 +116,22 @@ public enum MarkdownRenderer {
     }
 
     private static func pageCardCSS(_ s: PreviewSettings) -> String {
+        // Transparent body: the app places a glass (blur) material behind the
+        // web view, so the desktop shows through around the floating page.
         let width = s.maxWidth > 0 ? "\(Int(s.maxWidth))px" : "820px"
-        func block(desk: String, page: String, shadow: String) -> String {
+        func block(page: String, shadow: String) -> String {
             """
-            body { background: \(desk); max-width: none; margin: 0; padding: \(max(24, Int(s.pagePadding)))px 24px; }
-            .page { background: \(page); max-width: \(width); margin: 0 auto; padding: 34px 38px; border-radius: 10px; box-shadow: \(shadow); }
+            html { height: 100%; }
+            body { background: transparent; max-width: none; margin: 0; padding: \(max(24, Int(s.pagePadding)))px 24px; box-sizing: border-box; min-height: 100%; display: grid; align-content: safe center; }
+            .page { background: \(page); width: 100%; max-width: \(width); margin: 0 auto; padding: 34px 38px; box-sizing: border-box; border-radius: 12px; box-shadow: \(shadow); }
             """
         }
         let light = block(
-            desk: "#F2F0EC", page: s.light.background,
-            shadow: "0 6px 24px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)")
+            page: s.light.background,
+            shadow: "0 8px 28px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.05)")
         let dark = block(
-            desk: "#1E1C1A", page: s.dark.background,
-            shadow: "0 8px 28px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06)")
+            page: s.dark.background,
+            shadow: "0 10px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08)")
         switch s.appearance {
         case .light: return light
         case .dark: return dark

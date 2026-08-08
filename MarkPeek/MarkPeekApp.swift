@@ -7,6 +7,24 @@ extension Color {
     static let brand = Color(.sRGB, red: 0.545, green: 0.373, blue: 0.243)
 }
 
+/// Liquid-glass surface: blurs whatever is behind the window (the desktop),
+/// like the translucent chrome in Apple's latest OS design.
+struct Glass: NSViewRepresentable {
+    var material: NSVisualEffectView.Material = .underWindowBackground
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.material = material
+    }
+}
+
 // MARK: - App
 
 @main
@@ -57,16 +75,39 @@ struct RecentFile: Codable, Identifiable, Equatable {
 final class ReaderModel: ObservableObject {
     static let shared = ReaderModel()
 
+    enum ViewMode: String, CaseIterable {
+        case preview, split, edit
+    }
+
     @Published var fileURL: URL?
     @Published var markdown = ""
-    @Published var draft = ""
-    @Published var isEditing = false
+    @Published var draft = "" {
+        didSet { scheduleAutoSave() }
+    }
+    @Published var mode: ViewMode = .preview
     @Published var isImporting = false
     @Published var loadError: String?
     @Published var recents: [RecentFile] = ReaderModel.loadRecents()
+    @Published var autoSave = UserDefaults.standard.bool(forKey: "autoSave") {
+        didSet {
+            UserDefaults.standard.set(autoSave, forKey: "autoSave")
+            if autoSave { save() }
+        }
+    }
 
     /// URL currently holding a security-scope access grant (kept while the file is open so edits can be saved).
     private var accessedURL: URL?
+    private var autoSaveTask: Task<Void, Never>?
+
+    private func scheduleAutoSave() {
+        autoSaveTask?.cancel()
+        guard autoSave, hasUnsavedChanges else { return }
+        autoSaveTask = Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            save()
+        }
+    }
 
     var hasUnsavedChanges: Bool { fileURL != nil && draft != markdown }
 
@@ -87,7 +128,6 @@ final class ReaderModel: ObservableObject {
             markdown = try Self.readText(at: url)
             draft = markdown
             fileURL = url
-            isEditing = false
             loadError = nil
             noteRecent(url)
         } catch {
@@ -196,42 +236,106 @@ struct MainView: View {
     @ObservedObject private var model = ReaderModel.shared
     @ObservedObject private var store = SettingsStore.shared
     @State private var previewDark = false
+    @State private var showingHelp = false
+    @AppStorage("hasCompletedOnboarding") private var hasOnboarded = false
+    @State private var showOnboarding = false
 
     var body: some View {
+        mainContent
+            .onAppear {
+                if !hasOnboarded { showOnboarding = true }
+            }
+            .sheet(isPresented: $showOnboarding, onDismiss: { hasOnboarded = true }) {
+                OnboardingView()
+            }
+    }
+
+    private var mainContent: some View {
         NavigationSplitView {
             List(SidebarItem.allCases, selection: $selection) { item in
                 Label(item.title, systemImage: item.icon)
                     .tag(item)
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 170, ideal: 185, max: 230)
+            .navigationSplitViewColumnWidth(min: 165, ideal: 180, max: 220)
         } detail: {
             switch selection {
             case .reader:
                 ReaderView()
             case .presets:
-                settingsDetail { PresetsTab(store: store) }
+                settingsDetail("Presets") { PresetsTab(store: store) }
             case .typography:
-                settingsDetail { TypographyTab(store: store) }
+                settingsDetail("Typography") { TypographyTab(store: store) }
             case .layout:
-                settingsDetail { LayoutTab(store: store) }
+                settingsDetail("Layout") { LayoutTab(store: store) }
             case .colors:
-                settingsDetail { ColorsTab(store: store) }
+                settingsDetail("Colors") { ColorsTab(store: store) }
             case .about:
                 AboutView()
             }
         }
     }
 
-    private func settingsDetail<V: View>(@ViewBuilder content: () -> V) -> some View {
+    private func settingsDetail<V: View>(_ title: String, @ViewBuilder content: () -> V) -> some View {
         HSplitView {
             content()
-                .frame(minWidth: 340, idealWidth: 400, maxWidth: 480)
-            PreviewPane(settings: store.settings, previewDark: $previewDark)
-                .frame(minWidth: 320, maxWidth: .infinity)
+                .frame(minWidth: 300, idealWidth: 390, maxWidth: 470)
+            LivePreview(
+                markdown: sampleMarkdown,
+                settings: store.settings,
+                appearance: NSAppearance(named: previewDark ? .darkAqua : .aqua)
+            )
+            .frame(minWidth: 260, maxWidth: .infinity)
+        }
+        .navigationTitle(title)
+        .toolbar {
+            ToolbarItemGroup {
+                Picker("Preview appearance", selection: $previewDark) {
+                    Label("Light", systemImage: "sun.max").tag(false)
+                    Label("Dark", systemImage: "moon").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .help("Preview appearance")
+
+                Button {
+                    showingHelp.toggle()
+                } label: {
+                    Label("Help", systemImage: "questionmark.circle")
+                }
+                .accessibilityLabel("Setup help")
+                .help("How to use MarkPeek")
+                .popover(isPresented: $showingHelp, arrowEdge: .bottom) {
+                    SetupHelp()
+                }
+            }
         }
     }
 }
+
+let sampleMarkdown = """
+# Heading One
+Regular paragraph with **bold**, *italic*, `inline code`, and a [link](https://example.com).
+
+## Heading Two
+> A blockquote to check border and text colors.
+
+### Heading Three
+- Unordered item
+- Another item
+
+1. Ordered item
+2. Another item
+
+```
+func hello() {
+    print("Code block")
+}
+```
+
+---
+
+Final paragraph after a horizontal rule.
+"""
 
 // MARK: - Reader
 
@@ -244,13 +348,20 @@ struct ReaderView: View {
         Group {
             if model.fileURL == nil {
                 DropBrowseView()
-            } else if model.isEditing {
-                EditorView()
             } else {
-                MarkdownWebView(
-                    html: MarkdownRenderer.html(from: model.markdown, settings: store.settings, pageCard: true),
-                    appearance: readerAppearance
-                )
+                switch model.mode {
+                case .preview:
+                    LivePreview(markdown: model.draft, settings: store.settings, appearance: readerAppearance)
+                case .edit:
+                    EditorView()
+                case .split:
+                    HSplitView {
+                        EditorView()
+                            .frame(minWidth: 280)
+                        LivePreview(markdown: model.draft, settings: store.settings, appearance: readerAppearance)
+                            .frame(minWidth: 300)
+                    }
+                }
             }
         }
         .overlay {
@@ -263,22 +374,21 @@ struct ReaderView: View {
         .toolbar {
             ToolbarItemGroup {
                 if model.fileURL != nil {
-                    Picker("Mode", selection: $model.isEditing) {
-                        Label("Preview", systemImage: "eye").tag(false)
-                        Label("Edit", systemImage: "pencil").tag(true)
+                    Picker("Mode", selection: $model.mode) {
+                        Label("Preview", systemImage: "eye").tag(ReaderModel.ViewMode.preview)
+                        Label("Split", systemImage: "rectangle.split.2x1").tag(ReaderModel.ViewMode.split)
+                        Label("Edit", systemImage: "pencil").tag(ReaderModel.ViewMode.edit)
                     }
                     .pickerStyle(.segmented)
-                    .help("Switch between the rendered preview and the editor")
+                    .help("Preview, edit, or both side by side")
 
-                    if model.isEditing {
-                        Button {
-                            model.save()
-                        } label: {
-                            Label("Save", systemImage: "square.and.arrow.down")
-                        }
-                        .disabled(!model.hasUnsavedChanges)
-                        .help("Save changes (⌘S)")
+                    Button {
+                        model.save()
+                    } label: {
+                        Label("Save", systemImage: "square.and.arrow.down")
                     }
+                    .disabled(!model.hasUnsavedChanges)
+                    .help("Save changes (⌘S)")
                 }
 
                 PresetMenu(store: store)
@@ -323,6 +433,34 @@ struct ReaderView: View {
     }
 }
 
+/// Rendered preview that re-renders as the markdown or settings change,
+/// debounced so typing in split mode doesn't reload the web view per keystroke.
+struct LivePreview: View {
+    let markdown: String
+    let settings: PreviewSettings
+    let appearance: NSAppearance?
+    @State private var html = ""
+
+    private struct RenderKey: Hashable {
+        let markdown: String
+        let settings: PreviewSettings
+    }
+
+    var body: some View {
+        ZStack {
+            Glass()
+            MarkdownWebView(html: html, appearance: appearance)
+        }
+        .task(id: RenderKey(markdown: markdown, settings: settings)) {
+            if !html.isEmpty {
+                try? await Task.sleep(nanoseconds: 180_000_000)
+                if Task.isCancelled { return }
+            }
+            html = MarkdownRenderer.html(from: markdown, settings: settings, pageCard: true)
+        }
+    }
+}
+
 // MARK: - Editor
 
 struct EditorView: View {
@@ -349,9 +487,14 @@ struct EditorView: View {
                         .foregroundStyle(.tertiary)
                 }
                 Spacer()
+                Toggle("Auto Save", isOn: $model.autoSave)
+                    .toggleStyle(.checkbox)
+                    .controlSize(.small)
+                    .help("Save automatically shortly after you stop typing")
                 Text("\(model.draft.count) characters")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.tertiary)
+                    .padding(.leading, 10)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
@@ -435,6 +578,7 @@ struct DropBrowseView: View {
         .padding(28)
         .frame(maxWidth: 560)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Glass())
     }
 }
 
@@ -493,6 +637,7 @@ struct AboutView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Glass())
         .navigationTitle("About")
     }
 }
@@ -740,6 +885,8 @@ struct PresetsTab: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
         }
+        .scrollContentBackground(.hidden)
+        .background(Glass())
         .sheet(item: $namingSheet) { sheet in
             PresetNameSheet(title: sheet.title, name: sheet.name) { finalName in
                 sheet.action(finalName)
@@ -840,7 +987,8 @@ struct TypographyTab: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Typography")
+        .scrollContentBackground(.hidden)
+        .background(Glass())
     }
 
     private func fontPicker(_ label: String, selection: Binding<String>, fonts: [String]) -> some View {
@@ -874,7 +1022,8 @@ struct LayoutTab: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Layout")
+        .scrollContentBackground(.hidden)
+        .background(Glass())
     }
 }
 
@@ -886,18 +1035,23 @@ struct ColorsTab: View {
     var body: some View {
         Form {
             Section("Appearance") {
-                Picker("Previews Follow", selection: store.customize(\.appearance)) {
-                    ForEach(PreviewSettings.Appearance.allCases, id: \.self) { mode in
-                        Text(mode.displayName).tag(mode)
+                LabeledContent("Previews Follow") {
+                    Picker("Previews Follow", selection: store.customize(\.appearance)) {
+                        ForEach(PreviewSettings.Appearance.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
                 }
-                .pickerStyle(.segmented)
             }
             colorSection("Light Colors", set: \.light)
             colorSection("Dark Colors", set: \.dark)
         }
         .formStyle(.grouped)
-        .navigationTitle("Colors")
+        .scrollContentBackground(.hidden)
+        .background(Glass())
     }
 
     private func colorSection(_ title: String, set: WritableKeyPath<PreviewSettings, PreviewSettings.ColorSet>) -> some View {
@@ -957,75 +1111,131 @@ struct SettingSlider: View {
     }
 }
 
-// MARK: - Live preview (settings details)
+// MARK: - Onboarding (first launch)
 
-struct PreviewPane: View {
-    let settings: PreviewSettings
-    @Binding var previewDark: Bool
-    @State private var showingHelp = false
+struct OnboardingView: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var store = SettingsStore.shared
+    @State private var step = 0
+
+    private let lastStep = 2
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Preview")
-                    .font(.headline)
-                Spacer()
-                Picker("Preview appearance", selection: $previewDark) {
-                    Label("Light", systemImage: "sun.max").tag(false)
-                    Label("Dark", systemImage: "moon").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-
-                Button {
-                    showingHelp.toggle()
-                } label: {
-                    Image(systemName: "questionmark.circle")
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("Setup help")
-                .help("How to use MarkPeek")
-                .popover(isPresented: $showingHelp, arrowEdge: .bottom) {
-                    SetupHelp()
+            Group {
+                switch step {
+                case 0: welcome
+                case 1: quickLook
+                default: styles
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.bar)
-            Divider()
-            MarkdownWebView(
-                html: MarkdownRenderer.html(from: Self.sampleMarkdown, settings: settings, pageCard: true),
-                appearance: NSAppearance(named: previewDark ? .darkAqua : .aqua)
-            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 40)
+
+            HStack(spacing: 6) {
+                ForEach(0...lastStep, id: \.self) { i in
+                    Circle()
+                        .fill(i == step ? Color.brand : Color.secondary.opacity(0.3))
+                        .frame(width: 7, height: 7)
+                }
+            }
+            .padding(.bottom, 14)
+
+            HStack {
+                if step > 0 {
+                    Button("Back") { withAnimation(.snappy) { step -= 1 } }
+                }
+                Spacer()
+                Button(step == lastStep ? "Get Started" : "Continue") {
+                    if step == lastStep {
+                        dismiss()
+                    } else {
+                        withAnimation(.snappy) { step += 1 }
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 18)
+        }
+        .frame(width: 500, height: 440)
+    }
+
+    private var welcome: some View {
+        VStack(spacing: 12) {
+            Spacer()
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 100, height: 100)
+                .shadow(color: .black.opacity(0.18), radius: 9, y: 4)
+            Text("Welcome to MarkPeek")
+                .font(.title.bold())
+            Text("Beautiful Markdown, everywhere on your Mac — in Finder previews and right here in the app.")
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Spacer()
         }
     }
 
-    static let sampleMarkdown = """
-    # Heading One
-    Regular paragraph with **bold**, *italic*, `inline code`, and a [link](https://example.com).
-
-    ## Heading Two
-    > A blockquote to check border and text colors.
-
-    ### Heading Three
-    - Unordered item
-    - Another item
-
-    1. Ordered item
-    2. Another item
-
-    ```
-    func hello() {
-        print("Code block")
+    private var quickLook: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            HStack(spacing: 8) {
+                Text("space")
+                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 26)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary))
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.tertiary))
+            }
+            Text("Press Space in Finder")
+                .font(.title2.bold())
+            Text("Select any .md file and press Space — Quick Look shows it styled instead of raw text. Nothing to launch, ever.")
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Enable the Quick Look Extension…") {
+                let url = URL(string: "x-apple.systempreferences:com.apple.ExtensionsPreferences?extensionPointIdentifier=com.apple.quicklook.preview")!
+                NSWorkspace.shared.open(url)
+            }
+            .padding(.top, 2)
+            Text("Only needed if previews still look plain — most Macs enable it automatically.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+            Spacer()
+        }
     }
-    ```
 
-    ---
-
-    Final paragraph after a horizontal rule.
-    """
+    private var styles: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            Image(systemName: "paintbrush.pointed.fill")
+                .font(.system(size: 40))
+                .foregroundStyle(Color.brand)
+            Text("Pick a starting style")
+                .font(.title2.bold())
+            Picker("Style", selection: Binding(
+                get: { MarkdownStyle(rawValue: store.settings.presetName) ?? .modern },
+                set: { store.apply($0) }
+            )) {
+                ForEach(MarkdownStyle.allCases, id: \.self) { style in
+                    Text(style.displayName).tag(style)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: 340)
+            Text("Every font, color, and spacing is adjustable later — and you can save your own presets. Previews everywhere follow whatever style is active.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Spacer()
+        }
+    }
 }
+
+// MARK: - Setup help
 
 struct SetupHelp: View {
     var body: some View {
