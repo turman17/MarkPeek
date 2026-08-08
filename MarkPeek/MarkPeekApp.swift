@@ -1,20 +1,192 @@
 import SwiftUI
 import WebKit
+import UniformTypeIdentifiers
 
 extension Color {
     /// Brand brown sampled from the app icon — the app's single accent.
     static let brand = Color(.sRGB, red: 0.545, green: 0.373, blue: 0.243)
 }
 
+// MARK: - App
+
 @main
 struct MarkPeekApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @ObservedObject private var model = ReaderModel.shared
+
     var body: some Scene {
-        Window("MarkPeek", id: "main") {
+        Window("MarkPeek", id: "reader") {
+            ReaderView()
+                .frame(minWidth: 520, minHeight: 480)
+                .tint(.brand)
+        }
+        .windowResizability(.contentMinSize)
+        .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("Open…") { ReaderModel.shared.isImporting = true }
+                    .keyboardShortcut("o")
+            }
+        }
+
+        Settings {
             SettingsView()
                 .frame(minWidth: 880, minHeight: 560)
                 .tint(.brand)
         }
-        .windowResizability(.contentMinSize)
+    }
+}
+
+// "Open With MarkPeek" / double-click routing from Finder
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func application(_ application: NSApplication, open urls: [URL]) {
+        if let url = urls.first {
+            Task { @MainActor in ReaderModel.shared.open(url) }
+        }
+    }
+}
+
+// MARK: - Reader model
+
+@MainActor
+final class ReaderModel: ObservableObject {
+    static let shared = ReaderModel()
+
+    @Published var fileURL: URL?
+    @Published var markdown = ""
+    @Published var isImporting = false
+    @Published var loadError: String?
+
+    static let markdownExtensions = ["md", "markdown", "mdown", "mkd", "mkdn"]
+
+    static var markdownTypes: [UTType] {
+        markdownExtensions.compactMap { UTType(filenameExtension: $0) }
+    }
+
+    static func isMarkdown(_ url: URL) -> Bool {
+        markdownExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    func open(_ url: URL) {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        do {
+            markdown = try Self.readText(at: url)
+            fileURL = url
+            loadError = nil
+        } catch {
+            loadError = "Couldn't read \(url.lastPathComponent)"
+        }
+    }
+
+    static func readText(at url: URL) throws -> String {
+        if let utf8 = try? String(contentsOf: url, encoding: .utf8) {
+            return utf8
+        }
+        var encoding = String.Encoding.utf8
+        return try String(contentsOf: url, usedEncoding: &encoding)
+    }
+}
+
+// MARK: - Reader (main window)
+
+struct ReaderView: View {
+    @ObservedObject private var model = ReaderModel.shared
+    @ObservedObject private var store = SettingsStore.shared
+    @State private var isDropTargeted = false
+
+    var body: some View {
+        Group {
+            if model.fileURL != nil {
+                MarkdownWebView(
+                    html: MarkdownRenderer.html(from: model.markdown, settings: store.settings),
+                    appearance: readerAppearance
+                )
+            } else {
+                DropWelcome(isTargeted: isDropTargeted) {
+                    model.isImporting = true
+                }
+            }
+        }
+        .navigationTitle(model.fileURL?.lastPathComponent ?? "MarkPeek")
+        .toolbar {
+            ToolbarItemGroup {
+                Button {
+                    model.isImporting = true
+                } label: {
+                    Label("Open", systemImage: "folder")
+                }
+                .help("Open a Markdown file (⌘O)")
+
+                SettingsLink {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .help("Preview style settings (⌘,)")
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first(where: ReaderModel.isMarkdown) else { return false }
+            model.open(url)
+            return true
+        } isTargeted: { isDropTargeted = $0 }
+        .fileImporter(
+            isPresented: $model.isImporting,
+            allowedContentTypes: ReaderModel.markdownTypes
+        ) { result in
+            if case .success(let url) = result {
+                model.open(url)
+            }
+        }
+        .alert("Couldn't Open File", isPresented: .init(
+            get: { model.loadError != nil },
+            set: { if !$0 { model.loadError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(model.loadError ?? "")
+        }
+    }
+
+    private var readerAppearance: NSAppearance? {
+        switch store.settings.appearance {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
+struct DropWelcome: View {
+    let isTargeted: Bool
+    let onOpen: () -> Void
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "doc.richtext")
+                .font(.system(size: 52))
+                .foregroundStyle(isTargeted ? Color.brand : .secondary)
+                .symbolEffect(.bounce, value: isTargeted)
+            Text("Drop a Markdown File")
+                .font(.title3.weight(.semibold))
+            Text("It renders with your active preset — the same one Quick Look uses when you press Space in Finder.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 320)
+            Button("Open…", action: onOpen)
+                .keyboardShortcut("o")
+                .buttonStyle(.borderedProminent)
+                .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(
+                    isTargeted ? Color.brand : Color.secondary.opacity(0.25),
+                    style: StrokeStyle(lineWidth: 2, dash: [8, 6])
+                )
+                .padding(20)
+        }
+        .animation(.snappy, value: isTargeted)
     }
 }
 
@@ -22,6 +194,8 @@ struct MarkPeekApp: App {
 
 @MainActor
 final class SettingsStore: ObservableObject {
+    static let shared = SettingsStore()
+
     @Published var settings: PreviewSettings {
         didSet {
             settings.save()
@@ -101,10 +275,10 @@ final class SettingsStore: ObservableObject {
     }
 }
 
-// MARK: - Root view
+// MARK: - Settings window
 
 struct SettingsView: View {
-    @StateObject private var store = SettingsStore()
+    @ObservedObject private var store = SettingsStore.shared
     @State private var previewDark = false
 
     var body: some View {
@@ -457,7 +631,7 @@ struct SettingSlider: View {
     }
 }
 
-// MARK: - Live preview
+// MARK: - Live preview (settings)
 
 struct PreviewPane: View {
     let settings: PreviewSettings
@@ -496,7 +670,7 @@ struct PreviewPane: View {
             Divider()
             MarkdownWebView(
                 html: MarkdownRenderer.html(from: Self.sampleMarkdown, settings: settings),
-                dark: previewDark
+                appearance: NSAppearance(named: previewDark ? .darkAqua : .aqua)
             )
         }
     }
@@ -547,18 +721,21 @@ struct SetupHelp: View {
     }
 }
 
+// MARK: - Web view
+
 struct MarkdownWebView: NSViewRepresentable {
     let html: String
-    let dark: Bool
+    let appearance: NSAppearance?
 
     func makeNSView(context: Context) -> WKWebView {
         let webView = WKWebView()
         webView.setValue(false, forKey: "drawsBackground")
+        webView.navigationDelegate = context.coordinator
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        webView.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        webView.appearance = appearance
         if context.coordinator.lastHTML != html {
             context.coordinator.lastHTML = html
             webView.loadHTMLString(html, baseURL: nil)
@@ -567,8 +744,23 @@ struct MarkdownWebView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    final class Coordinator {
+    final class Coordinator: NSObject, WKNavigationDelegate {
         var lastHTML = ""
+
+        // Open tapped links in the default browser instead of navigating the reader
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        ) {
+            if navigationAction.navigationType == .linkActivated,
+               let url = navigationAction.request.url {
+                NSWorkspace.shared.open(url)
+                decisionHandler(.cancel)
+                return
+            }
+            decisionHandler(.allow)
+        }
     }
 }
 
