@@ -17,9 +17,10 @@ struct MarkPeekApp: App {
     var body: some Scene {
         Window("MarkPeek", id: "reader") {
             ReaderView()
-                .frame(minWidth: 520, minHeight: 480)
+                .frame(minWidth: 640, minHeight: 440)
                 .tint(.brand)
         }
+        .defaultSize(width: 780, height: 540)
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {
@@ -47,6 +48,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 // MARK: - Reader model
 
+struct RecentFile: Codable, Identifiable, Equatable {
+    var id: String { path }
+    let name: String
+    let path: String
+    let bookmark: Data
+}
+
 @MainActor
 final class ReaderModel: ObservableObject {
     static let shared = ReaderModel()
@@ -55,6 +63,7 @@ final class ReaderModel: ObservableObject {
     @Published var markdown = ""
     @Published var isImporting = false
     @Published var loadError: String?
+    @Published var recents: [RecentFile] = ReaderModel.loadRecents()
 
     static let markdownExtensions = ["md", "markdown", "mdown", "mkd", "mkdn"]
 
@@ -73,9 +82,58 @@ final class ReaderModel: ObservableObject {
             markdown = try Self.readText(at: url)
             fileURL = url
             loadError = nil
+            noteRecent(url)
         } catch {
             loadError = "Couldn't read \(url.lastPathComponent)"
         }
+    }
+
+    func openRecent(_ recent: RecentFile) {
+        var stale = false
+        guard let url = try? URL(
+            resolvingBookmarkData: recent.bookmark,
+            options: [.withSecurityScope],
+            relativeTo: nil,
+            bookmarkDataIsStale: &stale
+        ) else {
+            recents.removeAll { $0.id == recent.id }
+            saveRecents()
+            loadError = "\(recent.name) is no longer available"
+            return
+        }
+        open(url)
+    }
+
+    func removeRecent(_ recent: RecentFile) {
+        recents.removeAll { $0.id == recent.id }
+        saveRecents()
+    }
+
+    private func noteRecent(_ url: URL) {
+        // Dropped files may not allow security-scoped bookmarks; skip those.
+        guard let bookmark = try? url.bookmarkData(
+            options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        ) else { return }
+        let entry = RecentFile(name: url.lastPathComponent, path: url.path, bookmark: bookmark)
+        recents.removeAll { $0.path == entry.path }
+        recents.insert(entry, at: 0)
+        if recents.count > 8 { recents.removeLast(recents.count - 8) }
+        saveRecents()
+    }
+
+    private static let recentsKey = "recentFiles"
+
+    private static func loadRecents() -> [RecentFile] {
+        guard let data = UserDefaults.standard.data(forKey: recentsKey),
+              let recents = try? JSONDecoder().decode([RecentFile].self, from: data) else { return [] }
+        return recents
+    }
+
+    private func saveRecents() {
+        guard let data = try? JSONEncoder().encode(recents) else { return }
+        UserDefaults.standard.set(data, forKey: Self.recentsKey)
     }
 
     static func readText(at url: URL) throws -> String {
@@ -102,11 +160,15 @@ struct ReaderView: View {
                     appearance: readerAppearance
                 )
             } else {
-                DropWelcome(isTargeted: isDropTargeted) {
-                    model.isImporting = true
-                }
+                WelcomeView()
             }
         }
+        .overlay {
+            if isDropTargeted {
+                DropOverlay()
+            }
+        }
+        .animation(.snappy, value: isDropTargeted)
         .navigationTitle(model.fileURL?.lastPathComponent ?? "MarkPeek")
         .toolbar {
             ToolbarItemGroup {
@@ -155,38 +217,182 @@ struct ReaderView: View {
     }
 }
 
-struct DropWelcome: View {
-    let isTargeted: Bool
-    let onOpen: () -> Void
+// MARK: - Welcome (Xcode-style: brand pane + recents)
+
+struct WelcomeView: View {
+    @ObservedObject private var model = ReaderModel.shared
 
     var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "doc.richtext")
-                .font(.system(size: 52))
-                .foregroundStyle(isTargeted ? Color.brand : .secondary)
-                .symbolEffect(.bounce, value: isTargeted)
-            Text("Drop a Markdown File")
-                .font(.title3.weight(.semibold))
-            Text("It renders with your active preset — the same one Quick Look uses when you press Space in Finder.")
+        HStack(spacing: 0) {
+            brandPane
+                .frame(width: 300)
+            Divider()
+            recentsPane
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
+    private var brandPane: some View {
+        VStack(spacing: 4) {
+            Spacer()
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 108, height: 108)
+                .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
+            Text("MarkPeek")
+                .font(.system(size: 28, weight: .bold))
+                .padding(.top, 6)
+            Text("Version \(appVersion)")
                 .font(.callout)
                 .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 320)
-            Button("Open…", action: onOpen)
-                .keyboardShortcut("o")
-                .buttonStyle(.borderedProminent)
-                .padding(.top, 4)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Button {
+                    model.isImporting = true
+                } label: {
+                    WelcomeActionLabel(icon: "folder", title: "Open Markdown File…")
+                }
+                SettingsLink {
+                    WelcomeActionLabel(icon: "paintpalette", title: "Customize Styles…")
+                }
+            }
+            .buttonStyle(WelcomeActionStyle())
+            .padding(.top, 28)
+            Spacer()
+            Text("Or press Space on any .md file in Finder")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .padding(.bottom, 14)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
+        .frame(maxHeight: .infinity)
+        .background(BrandWash())
+    }
+
+    private var recentsPane: some View {
+        Group {
+            if model.recents.isEmpty {
+                ContentUnavailableView {
+                    Label("No Recent Files", systemImage: "clock")
+                } description: {
+                    Text("Markdown files you open appear here.")
+                }
+            } else {
+                List {
+                    Section("Recents") {
+                        ForEach(model.recents) { recent in
+                            Button {
+                                model.openRecent(recent)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "doc.text")
+                                        .font(.title3)
+                                        .foregroundStyle(Color.brand)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(recent.name)
+                                            .fontWeight(.medium)
+                                            .lineLimit(1)
+                                        Text(abbreviate(recent.path))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                            .truncationMode(.middle)
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button("Remove from Recents") { model.removeRecent(recent) }
+                            }
+                        }
+                    }
+                }
+                .listStyle(.inset)
+                .scrollContentBackground(.hidden)
+            }
+        }
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    private func abbreviate(_ path: String) -> String {
+        (path as NSString).abbreviatingWithTildeInPath
+    }
+}
+
+/// Warm cream wash in light mode, warm charcoal in dark — the icon's palette.
+struct BrandWash: View {
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        LinearGradient(
+            colors: scheme == .dark
+                ? [Color(.sRGB, red: 0.176, green: 0.157, blue: 0.133),
+                   Color(.sRGB, red: 0.141, green: 0.125, blue: 0.106)]
+                : [Color(.sRGB, red: 0.969, green: 0.945, blue: 0.902),
+                   Color(.sRGB, red: 0.933, green: 0.902, blue: 0.847)],
+            startPoint: .top, endPoint: .bottom
+        )
+    }
+}
+
+struct WelcomeActionLabel: View {
+    let icon: String
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.body.weight(.medium))
+                .foregroundStyle(Color.brand)
+                .frame(width: 20)
+            Text(title)
+                .fontWeight(.medium)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 210)
+        .contentShape(Rectangle())
+    }
+}
+
+struct WelcomeActionStyle: ButtonStyle {
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.vertical, 7)
+            .padding(.horizontal, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(hovering || configuration.isPressed
+                          ? Color.brand.opacity(configuration.isPressed ? 0.22 : 0.12)
+                          : .clear)
+            )
+            .onHover { hovering = $0 }
+    }
+}
+
+/// Shown only while a drag hovers over the window.
+struct DropOverlay: View {
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(.ultraThinMaterial)
             RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(
-                    isTargeted ? Color.brand : Color.secondary.opacity(0.25),
-                    style: StrokeStyle(lineWidth: 2, dash: [8, 6])
-                )
-                .padding(20)
+                .strokeBorder(Color.brand, lineWidth: 3)
+                .padding(10)
+            Label("Drop to Open", systemImage: "arrow.down.doc.fill")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(Color.brand)
+                .padding(.horizontal, 22)
+                .padding(.vertical, 14)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
-        .animation(.snappy, value: isTargeted)
+        .transition(.opacity)
+        .allowsHitTesting(false)
     }
 }
 
