@@ -1,13 +1,32 @@
 import QuickLookUI
 import UniformTypeIdentifiers
+import os
 
 // Data-based Quick Look preview: Finder invokes this when the user presses
-// space on a .md file. Returns styled HTML that Quick Look renders natively.
+// Space on a Markdown file. Returns styled HTML that Quick Look renders
+// natively with whatever theme is active in the MarkPeek app.
 class PreviewProvider: QLPreviewProvider, QLPreviewingController {
+    private static let log = Logger(subsystem: "com.markpeek.app", category: "QuickLook")
+
     func providePreview(for request: QLFilePreviewRequest) async throws -> QLPreviewReply {
-        let markdown = try Self.readText(at: request.fileURL)
-        let settings = PreviewSettings.load()
-        let htmlData = Data(MarkdownRenderer.html(from: markdown, settings: settings).utf8)
+        Self.log.info("preview requested for \(request.fileURL.lastPathComponent, privacy: .private)")
+        let markdown: String
+        do {
+            markdown = try Self.readText(at: request.fileURL)
+        } catch {
+            Self.log.error("read failed: \(error.localizedDescription, privacy: .public)")
+            throw error
+        }
+        let theme = ThemeStorage.loadActiveTheme()
+        // Quick Look's data-based renderer has no base URL, so images next to
+        // the file are embedded. The extension's read-only home-folder
+        // entitlement makes that possible; only files inside the document's
+        // folder are ever read.
+        let folder = request.fileURL.deletingLastPathComponent()
+        let options = RenderOptions(surface: .edgeToEdge, imageResolver: ImageEmbedder.resolver(folder: folder, containedOnly: true), inlineColors: true)
+        let html = MarkdownRenderer.document(markdown: markdown, theme: theme, options: options)
+        Self.log.info("rendered \(html.utf8.count) bytes with theme \(theme.name, privacy: .public)")
+        let htmlData = Data(html.utf8)
 
         let reply = QLPreviewReply(
             dataOfContentType: .html,

@@ -8,5 +8,9 @@
 	<array>
 		<string>YJ3UZ772GP.com.markpeek.app.shared</string>
 	</array>
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
+	<array>
+		<string>/</string>
+	</array>
 </dict>
 </plist>

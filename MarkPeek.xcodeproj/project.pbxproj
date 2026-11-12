@@ -3,21 +3,16 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		DD0000000000000000000001 /* MarkPeekApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000001 /* MarkPeekApp.swift */; };
-		DD0000000000000000000002 /* MarkdownStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000007 /* MarkdownStyle.swift */; };
-		DD0000000000000000000003 /* MarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000008 /* MarkdownRenderer.swift */; };
-		DD0000000000000000000004 /* PreviewProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000004 /* PreviewProvider.swift */; };
-		DD0000000000000000000005 /* MarkdownStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000007 /* MarkdownStyle.swift */; };
-		DD0000000000000000000006 /* MarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000008 /* MarkdownRenderer.swift */; };
 		DD0000000000000000000007 /* MarkPeekQuickLook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000002 /* MarkPeekQuickLook.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		DD0000000000000000000008 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000009 /* AppIcon.icns */; };
-		DD0000000000000000000009 /* PreviewSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000000000000000000000A /* PreviewSettings.swift */; };
-		DD000000000000000000000A /* PreviewSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000000000000000000000A /* PreviewSettings.swift */; };
-		DD000000000000000000000B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CC000000000000000000000B /* Assets.xcassets */; };
+		DD0000000000000000000010 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 550000000000000000000001 /* Markdown */; };
+		DD0000000000000000000011 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 550000000000000000000002 /* Markdown */; };
+		DD0000000000000000000012 /* MarkPeekThumbnail.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000003 /* MarkPeekThumbnail.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		DD0000000000000000000013 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 550000000000000000000003 /* Markdown */; };
+		DD0000000000000000000015 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 550000000000000000000005 /* Markdown */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -27,6 +22,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = FF0000000000000000000002;
 			remoteInfo = MarkPeekQuickLook;
+		};
+		FF0000000000000000000006 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 330000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FF0000000000000000000005;
+			remoteInfo = MarkPeekThumbnail;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -38,6 +40,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				DD0000000000000000000007 /* MarkPeekQuickLook.appex in Embed Foundation Extensions */,
+				DD0000000000000000000012 /* MarkPeekThumbnail.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -47,24 +50,77 @@
 /* Begin PBXFileReference section */
 		BB0000000000000000000001 /* MarkPeek.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MarkPeek.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB0000000000000000000002 /* MarkPeekQuickLook.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MarkPeekQuickLook.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		CC0000000000000000000001 /* MarkPeekApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkPeekApp.swift; sourceTree = "<group>"; };
-		CC0000000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		CC0000000000000000000003 /* MarkPeek.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MarkPeek.entitlements; sourceTree = "<group>"; };
-		CC0000000000000000000004 /* PreviewProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewProvider.swift; sourceTree = "<group>"; };
-		CC0000000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		CC0000000000000000000006 /* MarkPeekQuickLook.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MarkPeekQuickLook.entitlements; sourceTree = "<group>"; };
-		CC0000000000000000000007 /* MarkdownStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownStyle.swift; sourceTree = "<group>"; };
-		CC0000000000000000000008 /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
-		CC0000000000000000000009 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
-		CC000000000000000000000A /* PreviewSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewSettings.swift; sourceTree = "<group>"; };
-		CC000000000000000000000B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BB0000000000000000000003 /* MarkPeekThumbnail.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MarkPeekThumbnail.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB0000000000000000000004 /* MarkPeekTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MarkPeekTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		440000000000000000000001 /* Exceptions for "MarkPeek" folder in "MarkPeek" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = FF0000000000000000000001 /* MarkPeek */;
+		};
+		440000000000000000000002 /* Exceptions for "MarkPeekQuickLook" folder in "MarkPeekQuickLook" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = FF0000000000000000000002 /* MarkPeekQuickLook */;
+		};
+		440000000000000000000003 /* Exceptions for "MarkPeekThumbnail" folder in "MarkPeekThumbnail" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = FF0000000000000000000005 /* MarkPeekThumbnail */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		AA0000000000000000000002 /* MarkPeek */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				440000000000000000000001 /* Exceptions for "MarkPeek" folder in "MarkPeek" target */,
+			);
+			path = MarkPeek;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000003 /* MarkPeekQuickLook */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				440000000000000000000002 /* Exceptions for "MarkPeekQuickLook" folder in "MarkPeekQuickLook" target */,
+			);
+			path = MarkPeekQuickLook;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000004 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000006 /* MarkPeekThumbnail */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				440000000000000000000003 /* Exceptions for "MarkPeekThumbnail" folder in "MarkPeekThumbnail" target */,
+			);
+			path = MarkPeekThumbnail;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000007 /* MarkPeekTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MarkPeekTests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		EE0000000000000000000002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DD0000000000000000000010 /* Markdown in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,6 +128,23 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DD0000000000000000000011 /* Markdown in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EE0000000000000000000009 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DD0000000000000000000013 /* Markdown in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EE000000000000000000000C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DD0000000000000000000015 /* Markdown in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -84,40 +157,10 @@
 				AA0000000000000000000002 /* MarkPeek */,
 				AA0000000000000000000003 /* MarkPeekQuickLook */,
 				AA0000000000000000000004 /* Shared */,
+				AA0000000000000000000006 /* MarkPeekThumbnail */,
+				AA0000000000000000000007 /* MarkPeekTests */,
 				AA0000000000000000000005 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		AA0000000000000000000002 /* MarkPeek */ = {
-			isa = PBXGroup;
-			children = (
-				CC0000000000000000000001 /* MarkPeekApp.swift */,
-				CC000000000000000000000B /* Assets.xcassets */,
-				CC0000000000000000000009 /* AppIcon.icns */,
-				CC0000000000000000000002 /* Info.plist */,
-				CC0000000000000000000003 /* MarkPeek.entitlements */,
-			);
-			path = MarkPeek;
-			sourceTree = "<group>";
-		};
-		AA0000000000000000000003 /* MarkPeekQuickLook */ = {
-			isa = PBXGroup;
-			children = (
-				CC0000000000000000000004 /* PreviewProvider.swift */,
-				CC0000000000000000000005 /* Info.plist */,
-				CC0000000000000000000006 /* MarkPeekQuickLook.entitlements */,
-			);
-			path = MarkPeekQuickLook;
-			sourceTree = "<group>";
-		};
-		AA0000000000000000000004 /* Shared */ = {
-			isa = PBXGroup;
-			children = (
-				CC0000000000000000000007 /* MarkdownStyle.swift */,
-				CC0000000000000000000008 /* MarkdownRenderer.swift */,
-				CC000000000000000000000A /* PreviewSettings.swift */,
-			);
-			path = Shared;
 			sourceTree = "<group>";
 		};
 		AA0000000000000000000005 /* Products */ = {
@@ -125,6 +168,8 @@
 			children = (
 				BB0000000000000000000001 /* MarkPeek.app */,
 				BB0000000000000000000002 /* MarkPeekQuickLook.appex */,
+				BB0000000000000000000003 /* MarkPeekThumbnail.appex */,
+				BB0000000000000000000004 /* MarkPeekTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -145,8 +190,16 @@
 			);
 			dependencies = (
 				FF0000000000000000000003 /* PBXTargetDependency */,
+				FF0000000000000000000007 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000000000000000000002 /* MarkPeek */,
+				AA0000000000000000000004 /* Shared */,
 			);
 			name = MarkPeek;
+			packageProductDependencies = (
+				550000000000000000000001 /* Markdown */,
+			);
 			productName = MarkPeek;
 			productReference = BB0000000000000000000001 /* MarkPeek.app */;
 			productType = "com.apple.product-type.application";
@@ -163,10 +216,65 @@
 			);
 			dependencies = (
 			);
+			fileSystemSynchronizedGroups = (
+				AA0000000000000000000003 /* MarkPeekQuickLook */,
+				AA0000000000000000000004 /* Shared */,
+			);
 			name = MarkPeekQuickLook;
+			packageProductDependencies = (
+				550000000000000000000002 /* Markdown */,
+			);
 			productName = MarkPeekQuickLook;
 			productReference = BB0000000000000000000002 /* MarkPeekQuickLook.appex */;
 			productType = "com.apple.product-type.app-extension";
+		};
+		FF0000000000000000000005 /* MarkPeekThumbnail */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 220000000000000000000004 /* Build configuration list for PBXNativeTarget "MarkPeekThumbnail" */;
+			buildPhases = (
+				EE0000000000000000000008 /* Sources */,
+				EE0000000000000000000009 /* Frameworks */,
+				EE000000000000000000000A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000000000000000000006 /* MarkPeekThumbnail */,
+				AA0000000000000000000004 /* Shared */,
+			);
+			name = MarkPeekThumbnail;
+			packageProductDependencies = (
+				550000000000000000000003 /* Markdown */,
+			);
+			productName = MarkPeekThumbnail;
+			productReference = BB0000000000000000000003 /* MarkPeekThumbnail.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		FF0000000000000000000008 /* MarkPeekTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 220000000000000000000005 /* Build configuration list for PBXNativeTarget "MarkPeekTests" */;
+			buildPhases = (
+				EE000000000000000000000B /* Sources */,
+				EE000000000000000000000C /* Frameworks */,
+				EE000000000000000000000D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000000000000000000007 /* MarkPeekTests */,
+				AA0000000000000000000004 /* Shared */,
+			);
+			name = MarkPeekTests;
+			packageProductDependencies = (
+				550000000000000000000005 /* Markdown */,
+			);
+			productName = MarkPeekTests;
+			productReference = BB0000000000000000000004 /* MarkPeekTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -184,10 +292,16 @@
 					FF0000000000000000000002 = {
 						CreatedOnToolsVersion = 16.3;
 					};
+					FF0000000000000000000005 = {
+						CreatedOnToolsVersion = 16.3;
+					};
+					FF0000000000000000000008 = {
+						CreatedOnToolsVersion = 16.3;
+					};
 				};
 			};
 			buildConfigurationList = 220000000000000000000001 /* Build configuration list for PBXProject "MarkPeek" */;
-			compatibilityVersion = "Xcode 14.0";
+			compatibilityVersion = "Xcode 16.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -195,12 +309,19 @@
 				Base,
 			);
 			mainGroup = AA0000000000000000000001;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				660000000000000000000001 /* XCRemoteSwiftPackageReference "swift-markdown" */,
+			);
+			preferredProjectObjectVersion = 77;
 			productRefGroup = AA0000000000000000000005 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				FF0000000000000000000001 /* MarkPeek */,
 				FF0000000000000000000002 /* MarkPeekQuickLook */,
+				FF0000000000000000000005 /* MarkPeekThumbnail */,
+				FF0000000000000000000008 /* MarkPeekTests */,
 			);
 		};
 /* End PBXProject section */
@@ -210,12 +331,24 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DD0000000000000000000008 /* AppIcon.icns in Resources */,
-				DD000000000000000000000B /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		EE0000000000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EE000000000000000000000A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EE000000000000000000000D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -229,10 +362,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DD0000000000000000000001 /* MarkPeekApp.swift in Sources */,
-				DD0000000000000000000002 /* MarkdownStyle.swift in Sources */,
-				DD0000000000000000000003 /* MarkdownRenderer.swift in Sources */,
-				DD0000000000000000000009 /* PreviewSettings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -240,10 +369,20 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DD0000000000000000000004 /* PreviewProvider.swift in Sources */,
-				DD0000000000000000000005 /* MarkdownStyle.swift in Sources */,
-				DD0000000000000000000006 /* MarkdownRenderer.swift in Sources */,
-				DD000000000000000000000A /* PreviewSettings.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EE0000000000000000000008 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EE000000000000000000000B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -254,6 +393,11 @@
 			isa = PBXTargetDependency;
 			target = FF0000000000000000000002 /* MarkPeekQuickLook */;
 			targetProxy = FF0000000000000000000004 /* PBXContainerItemProxy */;
+		};
+		FF0000000000000000000007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FF0000000000000000000005 /* MarkPeekThumbnail */;
+			targetProxy = FF0000000000000000000006 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -316,10 +460,9 @@
 		110000000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = MarkPeek/MarkPeek.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MarkPeek/Info.plist;
@@ -327,7 +470,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.markpeek.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -336,10 +479,9 @@
 		110000000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = MarkPeek/MarkPeek.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MarkPeek/Info.plist;
@@ -347,7 +489,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.markpeek.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -358,7 +500,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = MarkPeekQuickLook/MarkPeekQuickLook.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MarkPeekQuickLook/Info.plist;
@@ -367,7 +509,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.markpeek.app.QuickLook;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -379,7 +521,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = MarkPeekQuickLook/MarkPeekQuickLook.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MarkPeekQuickLook/Info.plist;
@@ -388,10 +530,70 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.markpeek.app.QuickLook;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		110000000000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MarkPeekThumbnail/MarkPeekThumbnail.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 3;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MarkPeekThumbnail/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markpeek.app.Thumbnail;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		110000000000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MarkPeekThumbnail/MarkPeekThumbnail.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 3;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MarkPeekThumbnail/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markpeek.app.Thumbnail;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		110000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markpeek.app.Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		11000000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markpeek.app.Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
 		};
@@ -425,7 +627,59 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		220000000000000000000004 /* Build configuration list for PBXNativeTarget "MarkPeekThumbnail" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				110000000000000000000007 /* Debug */,
+				110000000000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		220000000000000000000005 /* Build configuration list for PBXNativeTarget "MarkPeekTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				110000000000000000000009 /* Debug */,
+				11000000000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		660000000000000000000001 /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swiftlang/swift-markdown.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		550000000000000000000001 /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 660000000000000000000001 /* XCRemoteSwiftPackageReference "swift-markdown" */;
+			productName = Markdown;
+		};
+		550000000000000000000002 /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 660000000000000000000001 /* XCRemoteSwiftPackageReference "swift-markdown" */;
+			productName = Markdown;
+		};
+		550000000000000000000003 /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 660000000000000000000001 /* XCRemoteSwiftPackageReference "swift-markdown" */;
+			productName = Markdown;
+		};
+		550000000000000000000005 /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 660000000000000000000001 /* XCRemoteSwiftPackageReference "swift-markdown" */;
+			productName = Markdown;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 330000000000000000000001 /* Project object */;
 }

@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>XPC!</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>2</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSExtension</key>
@@ -31,8 +31,12 @@
 			<key>QLSupportedContentTypes</key>
 			<array>
 				<string>net.daringfireball.markdown</string>
+				<string>com.markpeek.markdown</string>
 				<string>net.ia.markdown</string>
 				<string>com.unknown.md</string>
+				<string>org.textbundle.markdown</string>
+				<string>pro.writer.markdown</string>
+				<string>com.nutstore.down</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>
