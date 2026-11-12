@@ -194,6 +194,19 @@ enum MathProtector {
         func restore(_ html: String) -> String {
             var out = html
             for (index, span) in spans.enumerated() {
+                // A display block alone in a paragraph replaces the paragraph
+                // and takes its attributes (data-line): a <div> inside a <p>
+                // would close the paragraph early, leaving it empty.
+                if span.hasPrefix(MathProtector.displayOpen) {
+                    let pattern = "<p([^>]*)>" + NSRegularExpression.escapedPattern(for: placeholder(index)) + "</p>"
+                    if let regex = try? NSRegularExpression(pattern: pattern),
+                       let match = regex.firstMatch(in: out, range: NSRange(out.startIndex..., in: out)),
+                       let whole = Range(match.range, in: out), let attrs = Range(match.range(at: 1), in: out) {
+                        let div = "<div class=\"math-display\"\(out[attrs])>" + span.dropFirst(MathProtector.displayOpen.count)
+                        out.replaceSubrange(whole, with: div)
+                        continue
+                    }
+                }
                 out = out.replacingOccurrences(of: placeholder(index), with: span)
             }
             return out
@@ -201,6 +214,7 @@ enum MathProtector {
     }
 
     private static let marker = "\u{E000}"
+    fileprivate static let displayOpen = "<div class=\"math-display\">"
     private static func placeholder(_ index: Int) -> String { "\(marker)MATH\(index)\(marker)" }
 
     private static let inlinePattern = try! NSRegularExpression(pattern: #"(?<![\\$\w])\$(?!\s)((?:\\.|[^$\\\n])+?)(?<!\s)\$(?!\w|\$)"#)
@@ -229,7 +243,7 @@ enum MathProtector {
                     var content = displayBuffer!
                     content.append(String(trimmed.dropLast(2)))
                     let tex = content.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-                    spans.append("<div class=\"math-display\">\\[\(HTMLEscape.escape(tex))\\]</div>")
+                    spans.append("\(displayOpen)\\[\(HTMLEscape.escape(tex))\\]</div>")
                     output.append(placeholder(spans.count - 1))
                     lineSpans.append((displayStart, number))
                     displayBuffer = nil
@@ -250,7 +264,7 @@ enum MathProtector {
                 let rest = String(trimmed.dropFirst(2))
                 if rest.hasSuffix("$$"), rest.count >= 2 {
                     let tex = String(rest.dropLast(2)).trimmingCharacters(in: .whitespaces)
-                    spans.append("<div class=\"math-display\">\\[\(HTMLEscape.escape(tex))\\]</div>")
+                    spans.append("\(displayOpen)\\[\(HTMLEscape.escape(tex))\\]</div>")
                     output.append(placeholder(spans.count - 1))
                     lineSpans.append((number, number))
                 } else {

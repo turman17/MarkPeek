@@ -47,7 +47,9 @@ final class MarkdownRendererTests: XCTestCase {
         """
         let html = fragment(md, sourceMap: true)
         XCTAssertTrue(html.contains("<h1 id=\"heading\" data-line=\"5-5\">"), html)
-        XCTAssertTrue(html.contains("data-line=\"7-9\""), "display math block spans its source lines")
+        XCTAssertTrue(html.contains("<div class=\"math-display\" data-line=\"7-9\">"),
+                      "display math replaces its paragraph, so hover covers the formula: \(html)")
+        XCTAssertFalse(html.contains("<p data-line=\"7-9\">"), html)
         XCTAssertTrue(html.contains("<p data-line=\"11-11\">Para</p>"), html)
         XCTAssertFalse(fragment(md).contains("data-line"), "exports stay clean")
     }
