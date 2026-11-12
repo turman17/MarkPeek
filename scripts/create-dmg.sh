@@ -1,27 +1,36 @@
 #!/bin/bash
-set -e
+# Package /Applications/MarkPeek.app (built by build-and-install.sh) as a DMG
+# and a zip. The zip is what the in-app updater downloads from GitHub Releases.
+#
+#   bash scripts/create-dmg.sh                 # writes to .local/release
+#   OUT_DIR=~/Desktop bash scripts/create-dmg.sh
+#
+# Requires create-dmg (brew install create-dmg).
+set -euo pipefail
 
 APP_NAME="MarkPeek"
-VERSION="${VERSION:-1.0.0}"
-DMG_NAME="${APP_NAME}-v${VERSION}"
-DMG_OUTPUT="$HOME/Desktop/${DMG_NAME}.dmg"
+APP_PATH="/Applications/${APP_NAME}.app"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+VERSION="${VERSION:-$(defaults read "${APP_PATH}/Contents/Info.plist" CFBundleShortVersionString)}"
+NAME="${APP_NAME}-v${VERSION}"
+OUT_DIR="${OUT_DIR:-$PROJECT_DIR/.local/release}"
+DMG_OUTPUT="${OUT_DIR}/${NAME}.dmg"
+ZIP_OUTPUT="${OUT_DIR}/${NAME}.zip"
 BG_IMAGE="${PROJECT_DIR}/docs/dmg-background.tiff"
 
-echo "Creating DMG for ${APP_NAME} v${VERSION}..."
+command -v create-dmg >/dev/null || { echo "create-dmg is missing: brew install create-dmg" >&2; exit 1; }
+[ -d "$APP_PATH" ] || { echo "$APP_PATH not found. Run scripts/build-and-install.sh first." >&2; exit 1; }
+codesign --verify --deep --strict "$APP_PATH"
 
-# Clean
-rm -f "$DMG_OUTPUT"
-
-# Staging
-STAGING="/tmp/${DMG_NAME}-staging"
-rm -rf "$STAGING"
-mkdir -p "$STAGING"
-cp -R "/Applications/${APP_NAME}.app" "$STAGING/"
+mkdir -p "$OUT_DIR"
+STAGING="$(mktemp -d "/tmp/${NAME}-staging.XXXX")"
+trap 'rm -rf "$STAGING"' EXIT
+cp -R "$APP_PATH" "$STAGING/"
 ln -s /Applications "$STAGING/Applications"
 
-# Build DMG
+echo "==> Creating ${NAME}.dmg"
+rm -f "$DMG_OUTPUT" "$ZIP_OUTPUT"
 create-dmg \
     --volname "$APP_NAME" \
     --background "$BG_IMAGE" \
@@ -35,14 +44,10 @@ create-dmg \
     "$DMG_OUTPUT" \
     "$STAGING"
 
-rm -rf "$STAGING"
-
-# Zip alongside for direct distribution
-ZIP_OUTPUT="$HOME/Desktop/${DMG_NAME}.zip"
-rm -f "$ZIP_OUTPUT"
-ditto -c -k --keepParent "/Applications/${APP_NAME}.app" "$ZIP_OUTPUT"
+echo "==> Creating ${NAME}.zip (used by Check for Updates)"
+ditto -c -k --keepParent "$STAGING/${APP_NAME}.app" "$ZIP_OUTPUT"
 
 echo ""
-echo "✅ DMG created: $DMG_OUTPUT"
-echo "✅ ZIP created: $ZIP_OUTPUT"
+echo "DMG: $DMG_OUTPUT"
+echo "ZIP: $ZIP_OUTPUT"
 ls -lh "$DMG_OUTPUT" "$ZIP_OUTPUT"

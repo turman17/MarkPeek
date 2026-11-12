@@ -1,3 +1,27 @@
+# Build artifacts
 .local/
-.DS_Store
+.build/
+DerivedData/
+build/
+*.xcarchive
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Xcode
 xcuserdata/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Logs and scratch
+*.log
+scratch/
+
+# Tooling
+.claude/
+
+# Distribution
+*.dmg
+*.zip

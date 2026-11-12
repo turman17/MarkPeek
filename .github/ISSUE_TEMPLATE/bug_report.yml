@@ -1,0 +1,43 @@
+name: Bug report
+description: Something renders wrong, crashes, or doesn't work as described
+labels: [bug]
+body:
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: e.g. macOS 15.3, M2 MacBook Air
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: MarkPeek version
+      description: Shown in MarkPeek ▸ About MarkPeek
+      placeholder: e.g. 1.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where does it happen?
+      options:
+        - Quick Look (Space in Finder)
+        - Finder thumbnail
+        - The app (Preview / Split / Edit)
+        - PDF or HTML export
+        - Theme inspector or theme file
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead? A screenshot and a small Markdown sample that reproduces it help a lot (strip anything private first).
+    validations:
+      required: true
+  - type: input
+    id: theme
+    attributes:
+      label: Active theme
+      placeholder: e.g. GitHub, or a custom theme (attach the .markpeektheme if relevant)
