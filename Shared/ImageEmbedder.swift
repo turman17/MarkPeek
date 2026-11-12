@@ -25,9 +25,22 @@ public enum ImageEmbedder {
                 let resolved = url.standardizedFileURL.resolvingSymlinksInPath().path
                 guard resolved.hasPrefix(root + "/") else { return nil }
             }
+            // The live preview re-renders on every keystroke; only re-read an
+            // image when the file changed.
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            let key = "\(url.path)|\(modified?.timeIntervalSince1970 ?? 0)" as NSString
+            if let cached = cache.object(forKey: key) { return cached as String }
             guard let data = try? Data(contentsOf: url), data.count <= 25_000_000 else { return nil }
             let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "image/png"
-            return "data:\(mime);base64,\(data.base64EncodedString())"
+            let uri = "data:\(mime);base64,\(data.base64EncodedString())"
+            cache.setObject(uri as NSString, forKey: key, cost: uri.utf8.count)
+            return uri
         }
     }
+
+    nonisolated(unsafe) private static let cache: NSCache<NSString, NSString> = {
+        let cache = NSCache<NSString, NSString>()
+        cache.totalCostLimit = 150_000_000
+        return cache
+    }()
 }

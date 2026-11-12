@@ -147,8 +147,9 @@ struct FocusEditor: View {
     }
 }
 
-/// Re-renders when the text or theme changes, off the main thread and
-/// debounced so typing in split mode doesn't reload per keystroke.
+/// Re-renders on every change to the text or theme, off the main thread.
+/// The web view patches the result in place, so each keystroke shows up
+/// immediately without a reload.
 struct LivePreview: View {
     let markdown: String
     let theme: Theme
@@ -160,6 +161,10 @@ struct LivePreview: View {
     let scripts: [String]
     var isMainPreview = true
     @State private var html = ""
+    /// Renders run concurrently while typing; only a newer result may replace
+    /// what's shown, so a slow older render can't overwrite fresher text.
+    @State private var startedRenders = 0
+    @State private var shownRender = 0
 
     private struct RenderKey: Hashable {
         let markdown: String
@@ -176,16 +181,17 @@ struct LivePreview: View {
             MarkdownWebView(html: html, documentID: documentID, baseURL: baseURL, appearance: appearance, isMainPreview: isMainPreview)
         }
         .task(id: RenderKey(markdown: markdown, theme: theme, scheme: scheme, documentID: documentID, generation: generation, scriptCount: scripts.count)) {
-            if !html.isEmpty {
-                try? await Task.sleep(for: .milliseconds(160))
-                if Task.isCancelled { return }
-            }
+            startedRenders += 1
+            let render = startedRenders
             let options = RenderOptions(surface: .pageCard, colorScheme: scheme, imageResolver: imageResolver, scripts: scripts, sourceMap: true)
             let markdown = markdown, theme = theme
             let rendered = await Task.detached(priority: .userInitiated) {
                 MarkdownRenderer.document(markdown: markdown, theme: theme, options: options)
             }.value
-            if !Task.isCancelled { html = rendered }
+            if render > shownRender {
+                shownRender = render
+                html = rendered
+            }
         }
     }
 
@@ -242,10 +248,15 @@ struct DocumentPanes<Editor: View, Preview: View>: View {
                 preview()
                     .frame(width: total)
                 HStack(spacing: 0) {
+                    // The clip only hides the folded editor visually; AppKit
+                    // still hit-tests its full-width scroll view, which would
+                    // swallow scrolls meant for the preview underneath.
                     editor()
                         .frame(width: editorContent)
                         .frame(width: shownEditor, alignment: .leading)
                         .clipped()
+                        .opacity(shownEditor > 0 ? 1 : 0)
+                        .allowsHitTesting(shownEditor > 0)
                     if mode == .split {
                         self.divider(total: total)
                     }
@@ -415,7 +426,8 @@ struct EditorView: View {
                          inset: CGSize(width: Design.Space.m, height: Design.Space.m),
                          highlightedLines: preview.editorHighlight,
                          highlightColor: accent,
-                         onHover: { preview.editorHovered(line: $0) })
+                         onHover: { preview.editorHovered(line: $0) },
+                         onScroll: { preview.editorScrolled(toLine: $0) })
                 .background(Color(nsColor: .textBackgroundColor))
             Divider()
             HStack(spacing: Design.Space.m) {

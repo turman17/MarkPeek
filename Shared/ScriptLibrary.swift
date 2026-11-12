@@ -1,7 +1,8 @@
 import Foundation
 
 /// Bundled JavaScript engines (MathJax, Mermaid), inlined into a rendered
-/// document only when it uses them. Quick Look never runs scripts.
+/// document only when it uses them. Quick Look can't run scripts, so its
+/// extension runs them once offscreen and keeps the result (ScriptBaker).
 enum ScriptLibrary {
 
     static func scripts(for features: DocumentFeatures, scheme: ThemeColorScheme?) -> [String] {
@@ -42,6 +43,11 @@ enum ScriptLibrary {
     private static let readyScript = """
     (function () {
       window.__mpReady = false;
+      // Remember each block's source before the engines replace it, so the
+      // live preview can reuse renderings whose source didn't change.
+      document.querySelectorAll('.mermaid, .math-inline, .math-display').forEach(function (el) {
+        el.setAttribute('data-mp-src', el.textContent);
+      });
       var tasks = [];
       if (window.mermaid) { tasks.push(mermaid.run()); }
       if (window.MathJax && MathJax.startup) { tasks.push(MathJax.startup.promise); }
@@ -49,12 +55,21 @@ enum ScriptLibrary {
     })();
     """
 
+    /// The app bundle holds the engines; an extension finds it two levels up
+    /// (MarkPeek.app/Contents/PlugIns/X.appex).
+    private static var resourceBundle: Bundle {
+        let main = Bundle.main
+        guard main.bundleURL.pathExtension == "appex" else { return main }
+        let app = main.bundleURL.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        return Bundle(url: app) ?? main
+    }
+
     private static let cache = Cache()
 
     private static func load(_ name: String) -> String? {
         if let cached = cache.get(name) { return cached }
-        let url = Bundle.main.url(forResource: name, withExtension: "js", subdirectory: "vendor")
-            ?? Bundle.main.url(forResource: name, withExtension: "js")
+        let url = resourceBundle.url(forResource: name, withExtension: "js", subdirectory: "vendor")
+            ?? resourceBundle.url(forResource: name, withExtension: "js")
         guard let url, let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
         cache.set(name, text)
         return text

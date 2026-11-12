@@ -74,6 +74,25 @@ final class PreviewController: ObservableObject {
         webView?.evaluateJavaScript("window.__mpSetInset && window.__mpSetInset(\(rounded), \(animated))")
     }
 
+    // MARK: Scroll sync (split view)
+
+    private weak var editor: HoverTextView?
+
+    func attachEditor(_ editor: HoverTextView) {
+        self.editor = editor
+    }
+
+    /// The editor scrolled so that fractional source `line` is at its top.
+    func editorScrolled(toLine line: Double) {
+        guard syncsHover else { return }
+        webView?.evaluateJavaScript("window.__mpScrollToLine && window.__mpScrollToLine(\(line))")
+    }
+
+    fileprivate func previewScrolled(toLine line: Double) {
+        guard syncsHover else { return }
+        editor?.scroll(toLine: line)
+    }
+
     /// Turns the preview's hover tracking on or off; only Split links the panes.
     func syncHover(enabled: Bool) {
         webView?.evaluateJavaScript("window.__mpSetSync && window.__mpSetSync(\(enabled))")
@@ -120,6 +139,80 @@ final class PreviewController: ObservableObject {
         set(null);
         post(null);
       });
+      // Swaps the theme stylesheet and the content in place, keeping the
+      // scripts and the scroll position, so edits don't reload the page.
+      // Rendered math and diagrams are reused when their source is unchanged,
+      // so typing elsewhere doesn't flash them back to source.
+      window.__mpPatch = function (css, content, toTop) {
+        var style = document.head.querySelector('style');
+        if (style && style.textContent !== css) style.textContent = css;
+        var body = document.body, firstScript = body.querySelector(':scope > script');
+        var rendered = {};
+        body.querySelectorAll('[data-mp-src]').forEach(function (el) {
+          var done = kind(el) === 'm' ? el.hasAttribute('data-processed') : !!el.querySelector('mjx-container');
+          if (done) rendered[kind(el) + el.getAttribute('data-mp-src')] = el.innerHTML;
+        });
+        Array.prototype.slice.call(body.childNodes).forEach(function (n) {
+          // MathJax keeps its shared glyph definitions in MJX-* nodes.
+          if (n.nodeName !== 'SCRIPT' && !(n.id && n.id.indexOf('MJX') === 0)) body.removeChild(n);
+        });
+        var t = document.createElement('template');
+        t.innerHTML = content;
+        body.insertBefore(t.content, firstScript);
+        current = null;
+        if (toTop) window.scrollTo(0, 0);
+        var diagrams = [], math = [];
+        body.querySelectorAll('.mermaid, .math-inline, .math-display').forEach(function (el) {
+          var src = el.textContent, key = kind(el) + src;
+          el.setAttribute('data-mp-src', src);
+          if (key in rendered) {
+            el.innerHTML = rendered[key];
+            if (kind(el) === 'm') el.setAttribute('data-processed', 'true');
+          } else {
+            (kind(el) === 'm' ? diagrams : math).push(el);
+          }
+        });
+        if (diagrams.length && window.mermaid) mermaid.run({ nodes: diagrams });
+        if (math.length && window.MathJax && MathJax.typesetPromise) {
+          if (MathJax.typesetClear) MathJax.typesetClear();
+          MathJax.typesetPromise(math);
+        }
+      };
+      function kind(el) { return el.classList.contains('mermaid') ? 'm' : 'x'; }
+      // Scroll sync: block tops paired with their first source line, so a
+      // line maps to a page offset and back by interpolating between blocks.
+      var ignoreScrollUntil = 0, scrollQueued = false;
+      function anchors() {
+        var out = [{ line: 1, top: 0 }], all = document.querySelectorAll('[data-line]');
+        for (var i = 0; i < all.length; i++) {
+          var line = parseInt(all[i].getAttribute('data-line'), 10);
+          var top = all[i].getBoundingClientRect().top + window.scrollY;
+          var last = out[out.length - 1];
+          if (line > last.line && top > last.top) out.push({ line: line, top: top });
+        }
+        return out;
+      }
+      function interpolate(points, from, value, to) {
+        var i = points.length - 1;
+        while (i > 0 && points[i][from] > value) i--;
+        var a = points[i], b = points[i + 1];
+        if (!b || value <= a[from]) return a[to];
+        return a[to] + (value - a[from]) / (b[from] - a[from]) * (b[to] - a[to]);
+      }
+      window.__mpScrollToLine = function (line) {
+        if (!enabled) return;
+        ignoreScrollUntil = Date.now() + 150;
+        window.scrollTo(0, interpolate(anchors(), 'line', line, 'top'));
+      };
+      window.addEventListener('scroll', function () {
+        if (!enabled || scrollQueued || Date.now() < ignoreScrollUntil) return;
+        scrollQueued = true;
+        requestAnimationFrame(function () {
+          scrollQueued = false;
+          var line = interpolate(anchors(), 'top', window.scrollY, 'line');
+          try { window.webkit.messageHandlers.previewScroll.postMessage(line); } catch (e) {}
+        });
+      });
       window.__mpHover = function (line) {
         var best = null, bestSpan = Infinity;
         if (enabled && line > 0) {
@@ -162,16 +255,17 @@ final class PreviewController: ObservableObject {
         webView?.evaluateJavaScript("window.getSelection().removeAllRanges();")
     }
 
-    private static func json(_ string: String) -> String {
+    static func json(_ string: String) -> String {
         let data = try? JSONSerialization.data(withJSONObject: [string])
         let array = data.flatMap { String(data: $0, encoding: .utf8) } ?? "[\"\"]"
         return String(array.dropFirst().dropLast())
     }
 }
 
-/// Displays rendered HTML. Reloads only when the HTML actually changes, keeps
-/// the reading position across re-renders of the same document, and opens
-/// clicked links in the default browser instead of navigating away.
+/// Displays rendered HTML. Changes are patched into the loaded page (no
+/// reload, no flash, scroll position kept); a full load happens only for the
+/// first page, a new folder, or a different set of scripts. Opens clicked
+/// links in the default browser instead of navigating away.
 struct MarkdownWebView: NSViewRepresentable {
     let html: String
     /// Identifies the document; a change resets the remembered scroll position.
@@ -187,6 +281,7 @@ struct MarkdownWebView: NSViewRepresentable {
         let script = WKUserScript(source: PreviewController.hoverScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         configuration.userContentController.addUserScript(script)
         configuration.userContentController.add(context.coordinator, name: "sourceHover")
+        configuration.userContentController.add(context.coordinator, name: "previewScroll")
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.setValue(false, forKey: "drawsBackground")
         webView.navigationDelegate = context.coordinator
@@ -202,16 +297,51 @@ struct MarkdownWebView: NSViewRepresentable {
         coordinator.lastHTML = html
         let sameDocument = coordinator.documentID == documentID
         coordinator.documentID = documentID
+        let parts = PageParts(html)
+        let canPatch = coordinator.hasLoaded && parts != nil
+            && parts?.scripts == coordinator.scripts && baseURL == coordinator.baseURL
+        coordinator.scripts = parts?.scripts
+        coordinator.baseURL = baseURL
+        if canPatch, let parts {
+            let js = "window.__mpPatch(\(PreviewController.json(parts.css)), \(PreviewController.json(parts.content)), \(!sameDocument))"
+            webView.evaluateJavaScript(js) { _, _ in
+                guard webView === PreviewController.shared.webView else { return }
+                PreviewController.shared.updateFindCount()
+            }
+            return
+        }
         let page = insetHTML(html)
         guard sameDocument, coordinator.hasLoaded else {
             coordinator.pendingScrollY = 0
             webView.loadHTMLString(page, baseURL: baseURL)
             return
         }
-        // Remember where the reader was, then swap in the new HTML.
+        // Remember where the reader was, then load the new page.
         webView.evaluateJavaScript("window.scrollY") { value, _ in
             coordinator.pendingScrollY = (value as? Double) ?? 0
             webView.loadHTMLString(page, baseURL: baseURL)
+        }
+    }
+
+    /// The pieces of a `MarkdownRenderer.document` page that change between
+    /// renders: the theme stylesheet, the content, and the trailing scripts.
+    private struct PageParts: Equatable {
+        let css: String
+        let content: String
+        let scripts: String
+
+        init?(_ html: String) {
+            guard let styleOpen = html.range(of: "<style>"),
+                  let styleClose = html.range(of: "</style>", range: styleOpen.upperBound..<html.endIndex),
+                  let bodyOpen = html.range(of: "<body>", range: styleClose.upperBound..<html.endIndex),
+                  let bodyClose = html.range(of: "</body>", options: .backwards, range: bodyOpen.upperBound..<html.endIndex)
+            else { return nil }
+            css = String(html[styleOpen.upperBound..<styleClose.lowerBound])
+            let body = html[bodyOpen.upperBound..<bodyClose.lowerBound]
+            // Scripts are appended after the content (see ScriptLibrary).
+            let scriptStart = body.range(of: "\n<script>")?.lowerBound ?? body.endIndex
+            content = String(body[body.startIndex..<scriptStart])
+            scripts = String(body[scriptStart...])
         }
     }
 
@@ -231,10 +361,19 @@ struct MarkdownWebView: NSViewRepresentable {
         var documentID = ""
         var hasLoaded = false
         var pendingScrollY: Double = 0
+        /// Scripts and base URL of the loaded page; a change needs a full load.
+        var scripts: String?
+        var baseURL: URL?
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard message.name == "sourceHover" else { return }
-            PreviewController.shared.previewHovered(message.body as? String)
+            switch message.name {
+            case "sourceHover":
+                PreviewController.shared.previewHovered(message.body as? String)
+            case "previewScroll":
+                if let line = message.body as? Double { PreviewController.shared.previewScrolled(toLine: line) }
+            default:
+                break
+            }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

@@ -18,6 +18,9 @@ struct SourceEditor: NSViewRepresentable {
     var highlightColor: NSColor = .controlAccentColor
     /// Called when the mouse moves to another line, with nil when it leaves the text.
     var onHover: ((Int?) -> Void)? = nil
+    /// Called when the user scrolls, with the fractional source line at the top.
+    /// Setting it also lets the preview scroll this editor (split view sync).
+    var onScroll: ((Double) -> Void)? = nil
 
     func makeNSView(context: Context) -> NSScrollView {
         let storage = NSTextStorage()
@@ -47,6 +50,7 @@ struct SourceEditor: NSViewRepresentable {
         textView.minSize = .zero
         textView.maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.onHover = onHover
+        textView.onScroll = onScroll
         applyTypography(to: textView)
         textView.string = text
 
@@ -56,6 +60,10 @@ struct SourceEditor: NSViewRepresentable {
         scrollView.drawsBackground = false
         scrollView.borderType = .noBorder
         context.coordinator.textView = textView
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(context.coordinator, selector: #selector(Coordinator.didScroll),
+                                               name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
+        if onScroll != nil { PreviewController.shared.attachEditor(textView) }
         return scrollView
     }
 
@@ -64,6 +72,7 @@ struct SourceEditor: NSViewRepresentable {
         let coordinator = context.coordinator
         coordinator.parent = self
         textView.onHover = onHover
+        textView.onScroll = onScroll
         if textView.string != text {
             coordinator.isSettingText = true
             let selection = textView.selectedRange()
@@ -110,6 +119,10 @@ struct SourceEditor: NSViewRepresentable {
             guard !isSettingText, let textView else { return }
             parent.text = textView.string
         }
+
+        @objc func didScroll(_ notification: Notification) {
+            textView?.reportScroll()
+        }
     }
 }
 
@@ -121,6 +134,9 @@ final class HoverTextView: NSTextView {
         didSet { if highlightedLines != oldValue { needsDisplay = true } }
     }
     var highlightColor: NSColor = .controlAccentColor
+    var onScroll: ((Double) -> Void)?
+    /// Set while the preview drives the scroll, so it isn't echoed back.
+    private var isFollowing = false
 
     private var trackingArea: NSTrackingArea?
     private var hoveredLine: Int?
@@ -164,6 +180,55 @@ final class HoverTextView: NSTextView {
         guard y >= used.minY, y <= used.maxY else { return nil }
         let index = characterIndexForInsertion(at: point)
         return lineNumber(forCharacter: index)
+    }
+
+    // MARK: Scroll sync
+
+    func reportScroll() {
+        guard !isFollowing, let onScroll, let line = topLine() else { return }
+        onScroll(line)
+    }
+
+    /// Scrolls so that fractional source `line` sits at the top.
+    func scroll(toLine line: Double) {
+        guard let scrollView = enclosingScrollView, !string.isEmpty else { return }
+        let whole = min(max(Int(line), 1), starts().count)
+        let rect = lineRect(whole)
+        let y = rect.minY + rect.height * min(max(line - Double(whole), 0), 1) + textContainerOrigin.y
+        // The clip view scrolls in its own coordinates, where this view's
+        // origin isn't necessarily zero, so convert and clamp to the text.
+        let clip = scrollView.contentView
+        let target = convert(NSPoint(x: 0, y: y), to: clip).y
+        let top = convert(NSPoint.zero, to: clip).y
+        let bottom = max(top, top + frame.height - clip.bounds.height)
+        isFollowing = true
+        clip.scroll(to: NSPoint(x: clip.bounds.minX, y: min(max(target, top), bottom)))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        isFollowing = false
+    }
+
+    /// Fractional 1-based source line at the top of the visible area.
+    private func topLine() -> Double? {
+        guard let layoutManager, let textContainer, !string.isEmpty else { return nil }
+        let y = visibleRect.minY - textContainerOrigin.y
+        guard y > 0 else { return 1 }
+        let glyph = layoutManager.glyphIndex(for: NSPoint(x: 0, y: y), in: textContainer)
+        let line = lineNumber(forCharacter: layoutManager.characterIndexForGlyph(at: glyph))
+        let rect = lineRect(line)
+        guard rect.height > 0 else { return Double(line) }
+        return Double(line) + min(max((y - rect.minY) / rect.height, 0), 1)
+    }
+
+    /// Bounds of a 1-based source line (all its wrapped fragments), in
+    /// text container coordinates.
+    private func lineRect(_ line: Int) -> NSRect {
+        guard let layoutManager, let textContainer else { return .zero }
+        let starts = starts()
+        let location = starts[line - 1]
+        let end = line < starts.count ? starts[line] : (string as NSString).length
+        let glyphs = layoutManager.glyphRange(forCharacterRange: NSRange(location: location, length: end - location), actualCharacterRange: nil)
+        guard glyphs.length > 0 else { return layoutManager.extraLineFragmentRect }
+        return layoutManager.boundingRect(forGlyphRange: glyphs, in: textContainer)
     }
 
     private func starts() -> [Int] {
