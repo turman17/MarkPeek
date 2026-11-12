@@ -13,9 +13,20 @@ Native Swift · Offline · No accounts · No Electron
 
 **[Download](https://github.com/turman17/MarkPeek/releases/latest)**
 
-| Reader | Split view with hover sync |
+![MarkPeek: reading, editing in Split view, switching themes and the theme inspector](docs/screenshots/app-tour.gif)
+
+**Press Space in Finder** for a themed preview, then keep reading or editing in the app:
+
+![Quick Look preview in Finder, then live editing in Split view](docs/screenshots/finder-space.gif)
+
+| Light | Dark |
 |---|---|
-| ![Reader with the GitHub theme](docs/screenshots/reader.png) | ![Split view with source and preview linked by hover](docs/screenshots/split.png) |
+| ![Reader with the Serif theme in light mode](docs/screenshots/preview-light.png) | ![Reader with the Paper theme in dark mode](docs/screenshots/preview-dark.png) |
+| ![Split view with the GitHub theme in light mode](docs/screenshots/split-light.png) | ![Split view with the Serif theme in dark mode](docs/screenshots/split-dark.png) |
+
+| Theme inspector | Theme builder |
+|---|---|
+| ![Theme inspector next to the reader](docs/screenshots/inspector.png) | ![New Theme sheet: base, fonts, size, width and accents](docs/screenshots/theme-builder.png) |
 
 ## Install
 
@@ -54,12 +65,12 @@ The app checks GitHub for new releases once a day and can update itself in place
 
 **In the app**
 
-- **Three modes** (⌘1 ⌘2 ⌘3): a page-card **Preview**, a **Split** view with source on the left and the live preview on the right, and a plain **Edit** view. In Split, hovering a paragraph highlights it on the other side.
+- **Three modes** (⌘1 ⌘2 ⌘3): a page-card **Preview**, a **Split** view with source on the left and the live preview on the right, and a plain **Edit** view. In Split, the preview updates as you type, the two sides scroll together, and hovering a paragraph highlights it on the other side.
 - **Focus Mode** (⌥⌘F): editor only, centered, chrome hidden.
 - **Outline** in the sidebar, set in the theme's own font, jumps to any heading. **Find** (⌘F, ⌘G) in preview and editor. **Zoom** (⌘= ⌘− ⌘0).
 - **Live reload**: files edited elsewhere update in place; unsaved edits here are kept and you choose Reload or Keep. **Autosave** optional.
 - **GitHub-flavored Markdown** via Apple's [swift-markdown](https://github.com/swiftlang/swift-markdown): tables, task lists, strikethrough, nested lists, images, autolinks, heading anchors, raw HTML (with scripts removed).
-- **Math and diagrams**: `$…$` and `$$…$$` via MathJax, ```` ```mermaid ```` blocks via Mermaid, bundled offline and inlined only when a document uses them. Quick Look shows the source.
+- **Math and diagrams**: `$…$` and `$$…$$` via MathJax, ```` ```mermaid ```` blocks via Mermaid, bundled offline and inlined only when a document uses them, in the app, exports and Quick Look.
 - **Front matter**: a leading YAML block renders as a small table, hidden, or raw (theme option).
 - **Syntax highlighting** for fenced code in 17 language families, with optional line numbers and language badges.
 
