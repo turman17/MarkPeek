@@ -23,8 +23,20 @@ class PreviewProvider: QLPreviewProvider, QLPreviewingController {
         // entitlement makes that possible; only files inside the document's
         // folder are ever read.
         let folder = request.fileURL.deletingLastPathComponent()
-        let options = RenderOptions(surface: .edgeToEdge, imageResolver: ImageEmbedder.resolver(folder: folder, containedOnly: true), inlineColors: true)
-        let html = MarkdownRenderer.document(markdown: markdown, theme: theme, options: options)
+        var options = RenderOptions(surface: .edgeToEdge, imageResolver: ImageEmbedder.resolver(folder: folder, containedOnly: true), inlineColors: true)
+        var html = MarkdownRenderer.document(markdown: markdown, theme: theme, options: options)
+        // Math and diagrams need their engines; run them offscreen and keep
+        // the result. Without it the preview shows their source.
+        let features = MarkdownRenderer.features(of: markdown)
+        if features.math || features.mermaid {
+            options.scripts = ScriptLibrary.scripts(for: features, scheme: nil)
+            let live = MarkdownRenderer.document(markdown: markdown, theme: theme, options: options)
+            if let baked = await ScriptBaker.bake(live, width: 800) {
+                html = baked
+            } else {
+                Self.log.error("math/diagram rendering timed out; showing source")
+            }
+        }
         Self.log.info("rendered \(html.utf8.count) bytes with theme \(theme.name, privacy: .public)")
         let htmlData = Data(html.utf8)
 

@@ -27,7 +27,7 @@ public struct RenderOptions: Sendable {
     /// `var()`, so the extension needs this.
     public var inlineColors = false
     /// JavaScript appended at the end of the body (math and diagram engines).
-    /// Only the app supplies these; Quick Look renders without scripts.
+    /// Quick Look bakes them offscreen first, since it never runs scripts.
     public var scripts: [String] = []
     /// Tags block elements with `data-line="start-end"` (1-based lines of the
     /// Markdown) so the app can link the preview to the editor. Off for
