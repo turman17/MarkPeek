@@ -33,9 +33,12 @@ Native Swift · Offline · No accounts · No Electron
 **Homebrew**
 
 ```bash
+brew trust --cask turman17/tap/markpeek
 brew install --cask turman17/tap/markpeek
 xattr -dr com.apple.quarantine /Applications/MarkPeek.app
 ```
+
+Homebrew 7 and later only installs casks from taps you trust, hence the first line; skip it on older versions.
 
 **One-line install** (downloads the latest release into `/Applications` and clears the quarantine flag for you; [read the script](scripts/install.sh))
 

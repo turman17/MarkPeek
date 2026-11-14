@@ -4,6 +4,7 @@
 # copy it into a tap repository named `homebrew-tap` under your GitHub
 # account, at Casks/markpeek.rb. Users then install with:
 #
+#   brew trust --cask turman17/tap/markpeek   # Homebrew 7+ only
 #   brew install --cask turman17/tap/markpeek
 #
 # After each release, update `version` and `sha256` (scripts/release.sh
@@ -21,9 +22,12 @@ cask "markpeek" do
 
   app "MarkPeek.app"
 
-  postflight do
-    system_command "/usr/bin/qlmanage", args: ["-r"]
-  end
+  zap trash: [
+    "~/Library/Containers/com.markpeek.app",
+    "~/Library/Containers/com.markpeek.app.QuickLook",
+    "~/Library/Containers/com.markpeek.app.Thumbnail",
+    "~/Library/Group Containers/YJ3UZ772GP.com.markpeek.app.shared",
+  ]
 
   caveats <<~EOS
     MarkPeek is not notarized (no paid Apple Developer account).
@@ -34,11 +38,4 @@ cask "markpeek" do
     Then launch the app once. If Finder previews still show raw text, enable
     MarkPeek under System Settings > General > Login Items & Extensions > Quick Look.
   EOS
-
-  zap trash: [
-    "~/Library/Group Containers/YJ3UZ772GP.com.markpeek.app.shared",
-    "~/Library/Containers/com.markpeek.app",
-    "~/Library/Containers/com.markpeek.app.QuickLook",
-    "~/Library/Containers/com.markpeek.app.Thumbnail",
-  ]
 end
