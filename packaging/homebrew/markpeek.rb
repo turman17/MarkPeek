@@ -10,7 +10,7 @@
 # prints both).
 cask "markpeek" do
   version "1.0.0"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  sha256 "2dd6899cb4ca3c4d92bae9450459cd617f2df56478c62639d7758aa8aefe20eb"
 
   url "https://github.com/turman17/MarkPeek/releases/download/v#{version}/MarkPeek-v#{version}.zip"
   name "MarkPeek"

@@ -462,7 +462,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = MarkPeek/MarkPeek.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MarkPeek/Info.plist;
@@ -481,7 +481,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = MarkPeek/MarkPeek.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MarkPeek/Info.plist;
@@ -500,7 +500,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = MarkPeekQuickLook/MarkPeekQuickLook.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MarkPeekQuickLook/Info.plist;
@@ -521,7 +521,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = MarkPeekQuickLook/MarkPeekQuickLook.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MarkPeekQuickLook/Info.plist;
@@ -542,7 +542,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = MarkPeekThumbnail/MarkPeekThumbnail.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MarkPeekThumbnail/Info.plist;
@@ -563,7 +563,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = MarkPeekThumbnail/MarkPeekThumbnail.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MarkPeekThumbnail/Info.plist;
