@@ -11,7 +11,7 @@ Native Swift · Offline · No accounts · No Electron
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black)](https://github.com/turman17/MarkPeek/releases/latest)
 
-**[Download](https://github.com/turman17/MarkPeek/releases/latest)**
+**[Website](https://turman17.github.io/MarkPeek-website/)** · **[Download](https://github.com/turman17/MarkPeek/releases/latest)**
 
 ![MarkPeek: reading, editing in Split view, switching themes and the theme inspector](docs/screenshots/app-tour.gif)
 
